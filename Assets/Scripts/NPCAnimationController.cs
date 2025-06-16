@@ -1,6 +1,6 @@
-// Copyright (c) 2024 Synty Studios Limited. All rights reserved.
+ï»¿// Copyright (c) 2024 Synty Studios Limited. All rights reserved.
 //
-// Modified for NPC behavior with behavior tree system and advanced vision
+// Modified for NPC behavior with behavior tree system and advanced vision + Special Points System + Leader Functionality
 
 using System.Collections;
 using System.Collections.Generic;
@@ -92,6 +92,15 @@ namespace Synty.AnimationBaseLocomotion.NPC
         [SerializeField] private float _waypointReachDistance = 1f;
         [SerializeField] private float _waypointWaitTime = 2f;
 
+        [Header("Special Points System")]
+        [SerializeField] private Transform[] _specialPoints;
+        [SerializeField] private float _specialPointDetectionRange = 5f;
+        [SerializeField] private float _specialPointReachDistance = 1f;
+        [SerializeField] private float _specialPointStayTime = 10f;
+        [SerializeField] private float _specialPointActivationChance = 0.3f;
+        [SerializeField] private float _specialPointCooldownTime = 10f;
+        [SerializeField] private bool _enableSpecialPoints = true;
+
         [Header("Detection Settings")]
         [SerializeField] private LayerMask _obstacleLayerMask = -1;
         [SerializeField] private float _obstacleDetectionDistance = 1.0f;
@@ -100,7 +109,12 @@ namespace Synty.AnimationBaseLocomotion.NPC
         [SerializeField] private float _playerDetectionAngle = 60f;
         [SerializeField] private float _playerDetectionDistance = 10f;
         [SerializeField] private string _playerTag = "Player";
-        [SerializeField] private LayerMask _blockingLayerMask = -1; // ĞÂÔö£º¶¨ÒåÄÄĞ©Í¼²ã»á×èµ²ÊÓÏß
+        [SerializeField] private LayerMask _blockingLayerMask = -1;
+
+        [Header("Leader Settings")]
+        [SerializeField] private bool _isLeader = false;
+        [SerializeField] private float _penaltyCooldown = 3f;
+        [SerializeField] private bool _enablePenaltyDebug = true;
 
         [Header("Vision System")]
         [SerializeField] private bool _enableHeadTurn = true;
@@ -184,13 +198,36 @@ namespace Synty.AnimationBaseLocomotion.NPC
         [Tooltip("Currently detected player transform")]
         [SerializeField] private Transform _detectedPlayer;
         [Tooltip("Is player blocked by obstacles?")]
-        [SerializeField] private bool _isPlayerBlocked = false; // ĞÂÔö£ºÍæ¼ÒÊÇ·ñ±»ÕÚµ²
+        [SerializeField] private bool _isPlayerBlocked = false;
+        [Tooltip("Is player currently slacking at work?")]
+        [SerializeField] private bool _isPlayerSlacking = false;
+
+        // Leader penalty system
+        private float _lastPenaltyTime = -999f;
 
         // Path following
         private int _currentWaypointIndex = 0;
         private float _waypointWaitTimer = 0f;
         private bool _isWaitingAtWaypoint = false;
         private bool _isFollowingPath = false;
+
+        // Special Points System
+        [Header("Special Points Status (Debug)")]
+        [Tooltip("Is currently going to a special point?")]
+        [SerializeField] private bool _isGoingToSpecialPoint = false;
+        [Tooltip("Is currently at a special point?")]
+        [SerializeField] private bool _isAtSpecialPoint = false;
+        [Tooltip("Current special point being targeted")]
+        [SerializeField] private Transform _currentSpecialPoint;
+        [Tooltip("Position to return to after visiting special point")]
+        [SerializeField] private Vector3 _returnPosition;
+        [Tooltip("Time remaining for special point cooldown")]
+        [SerializeField] private float _specialPointCooldownRemaining = 0f;
+
+        private int _returnWaypointIndex;
+        private float _specialPointTimer = 0f;
+        private float _lastSpecialPointCheckTime = 0f;
+        private HashSet<Transform> _visitedSpecialPoints = new HashSet<Transform>();
 
         // Animation helpers
         private float _headLookDelay;
@@ -217,7 +254,9 @@ namespace Synty.AnimationBaseLocomotion.NPC
         public bool HasPlayerInSight => _hasPlayerInSight;
         public bool HasObstacleAhead => _hasObstacleAhead;
         public Transform DetectedPlayer => _detectedPlayer;
-        public bool IsPlayerBlocked => _isPlayerBlocked; // ĞÂÔö
+        public bool IsPlayerBlocked => _isPlayerBlocked;
+        public bool IsPlayerSlacking => _isPlayerSlacking;
+        public bool IsLeader => _isLeader;
         public bool IsMoving => _speed2D > 0.1f;
         public bool IsGrounded => _isGrounded;
         public float ObstacleDetectionDistance => _obstacleDetectionDistance;
@@ -228,6 +267,13 @@ namespace Synty.AnimationBaseLocomotion.NPC
         public bool IsScanning => _isScanning;
         public bool IsScanningStationary => _isScanningStationary;
         public bool IsPlayerLocked => _isPlayerLocked;
+
+        // Special Points Properties
+        public bool IsGoingToSpecialPoint => _isGoingToSpecialPoint;
+        public bool IsAtSpecialPoint => _isAtSpecialPoint;
+        public Transform CurrentSpecialPoint => _currentSpecialPoint;
+        public bool EnableSpecialPoints => _enableSpecialPoints;
+        public float SpecialPointCooldownRemaining => _specialPointCooldownRemaining;
 
         #endregion
 
@@ -246,6 +292,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
             ScanForObstacles();
             ScanForPlayer();
             UpdatePathFollowing();
+            UpdateSpecialPoints();
 
             _behaviorTree?.Update();
 
@@ -268,21 +315,32 @@ namespace Synty.AnimationBaseLocomotion.NPC
 
         private void OnDrawGizmosSelected()
         {
-            // ÕÏ°­Îï¼ì²â¿ÉÊÓ»¯
+            // éšœç¢ç‰©æ£€æµ‹å¯è§†åŒ–
             Gizmos.color = _hasObstacleAhead ? Color.red : Color.green;
             Vector3 leftBoundary = Quaternion.AngleAxis(-_obstacleDetectionAngle / 2f, Vector3.up) * transform.forward * _obstacleDetectionDistance;
             Vector3 rightBoundary = Quaternion.AngleAxis(_obstacleDetectionAngle / 2f, Vector3.up) * transform.forward * _obstacleDetectionDistance;
             Gizmos.DrawRay(transform.position, leftBoundary);
             Gizmos.DrawRay(transform.position, rightBoundary);
 
-            // Íæ¼Ò¼ì²â¿ÉÊÓ»¯ - ¸ù¾İÕÚµ²×´Ì¬¸Ä±äÑÕÉ«
+            // ç©å®¶æ£€æµ‹å¯è§†åŒ–
             if (_hasPlayerInSight)
             {
-                Gizmos.color = _isPlayerBlocked ? Color.yellow : Color.blue; // »ÆÉ«±íÊ¾±»ÕÚµ²£¬À¶É«±íÊ¾¿É¼û
+                if (_isPlayerSlacking && _isLeader)
+                {
+                    Gizmos.color = Color.red; // é¢†å¯¼å‘ç°ç©å®¶æ‘¸é±¼
+                }
+                else if (_isPlayerBlocked)
+                {
+                    Gizmos.color = Color.yellow; // ç©å®¶è¢«é˜»æŒ¡
+                }
+                else
+                {
+                    Gizmos.color = Color.blue; // æ­£å¸¸æ£€æµ‹åˆ°ç©å®¶
+                }
             }
             else
             {
-                Gizmos.color = Color.gray; // »ÒÉ«±íÊ¾Î´¼ì²âµ½
+                Gizmos.color = Color.gray;
             }
 
             Vector3 headDirection = GetHeadLookDirection();
@@ -291,18 +349,29 @@ namespace Synty.AnimationBaseLocomotion.NPC
             Gizmos.DrawRay(transform.position, leftPlayerBoundary);
             Gizmos.DrawRay(transform.position, rightPlayerBoundary);
 
-            // ¼ì²â·¶Î§ÇòÌå
+            // æ£€æµ‹èŒƒå›´çƒä½“
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(transform.position, _playerDetectionDistance);
 
-            // Èç¹û¼ì²âµ½Íæ¼Ò£¬»æÖÆµ½Íæ¼ÒµÄÁ¬Ïß
+            // å¦‚æœæ£€æµ‹åˆ°ç©å®¶ï¼Œç»˜åˆ¶åˆ°ç©å®¶çš„è¿çº¿
             if (_detectedPlayer != null)
             {
-                Gizmos.color = _isPlayerBlocked ? Color.yellow : Color.blue;
+                if (_isPlayerSlacking && _isLeader)
+                {
+                    Gizmos.color = Color.red;
+                }
+                else if (_isPlayerBlocked)
+                {
+                    Gizmos.color = Color.yellow;
+                }
+                else
+                {
+                    Gizmos.color = Color.blue;
+                }
                 Gizmos.DrawLine(transform.position + Vector3.up * 1.7f, _detectedPlayer.position + Vector3.up * 1f);
             }
 
-            // Â·¾¶µã¿ÉÊÓ»¯
+            // è·¯å¾„ç‚¹å¯è§†åŒ–
             if (_waypoints != null && _waypoints.Length > 1)
             {
                 Gizmos.color = Color.cyan;
@@ -319,6 +388,55 @@ namespace Synty.AnimationBaseLocomotion.NPC
                     }
                 }
             }
+
+            // ç‰¹æ®Šç‚¹å¯è§†åŒ–
+            if (_specialPoints != null && _specialPoints.Length > 0)
+            {
+                for (int i = 0; i < _specialPoints.Length; i++)
+                {
+                    if (_specialPoints[i] != null)
+                    {
+                        // ç‰¹æ®Šç‚¹æœ¬èº« - æ©™è‰²
+                        Gizmos.color = Color.magenta;
+                        Gizmos.DrawWireSphere(_specialPoints[i].position, 0.8f);
+                        Gizmos.DrawCube(_specialPoints[i].position + Vector3.up * 0.5f, Vector3.one * 0.3f);
+
+                        // æ£€æµ‹èŒƒå›´ - åŠé€æ˜æ©™è‰²
+                        Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
+                        Gizmos.DrawSphere(_specialPoints[i].position, _specialPointDetectionRange);
+
+                        // æ£€æµ‹èŒƒå›´è¾¹ç•Œ - æ©™è‰²çº¿æ¡†
+                        Gizmos.color = Color.red;
+                        Gizmos.DrawWireSphere(_specialPoints[i].position, _specialPointDetectionRange);
+
+                        // åˆ°è¾¾èŒƒå›´ - çº¢è‰²
+                        Gizmos.color = Color.red;
+                        Gizmos.DrawWireSphere(_specialPoints[i].position, _specialPointReachDistance);
+                    }
+                }
+            }
+
+            // å½“å‰ç‰¹æ®Šç‚¹è¿çº¿
+            if (_currentSpecialPoint != null)
+            {
+                Gizmos.color = Color.magenta;
+                Gizmos.DrawLine(transform.position, _currentSpecialPoint.position);
+            }
+
+            // è¿”å›ä½ç½®æ ‡è®°
+            if (_isGoingToSpecialPoint || _isAtSpecialPoint)
+            {
+                Gizmos.color = Color.green;
+                Gizmos.DrawWireCube(_returnPosition, Vector3.one);
+                Gizmos.DrawLine(transform.position, _returnPosition);
+            }
+
+            // é¢†å¯¼æ ‡è¯†
+            if (_isLeader)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawWireCube(transform.position + Vector3.up * 2.5f, Vector3.one * 0.3f);
+            }
         }
 
         #endregion
@@ -327,6 +445,17 @@ namespace Synty.AnimationBaseLocomotion.NPC
 
         private void UpdateVisionSystem()
         {
+            // å¦‚æœåœ¨ç‰¹æ®Šç‚¹ç­‰å¾…ï¼Œä¸è¿›è¡Œä»»ä½•æ‰«è§†æˆ–è½¬å¤´ï¼Œä¿æŒidleçŠ¶æ€
+            if (_isAtSpecialPoint)
+            {
+                _targetHeadAngle = 0f;
+                _isScanning = false;
+                _isScanningStationary = false;
+                _isPlayerLocked = false;
+                UpdateHeadRotation();
+                return;
+            }
+
             UpdateHeadRotation();
 
             if (_isPlayerLocked && _detectedPlayer != null)
@@ -493,60 +622,46 @@ namespace Synty.AnimationBaseLocomotion.NPC
             }
         }
 
-        // ĞŞ¸ÄºóµÄScanForPlayer·½·¨
         private void ScanForPlayer()
         {
             _hasPlayerInSight = false;
-            _isPlayerBlocked = false; // ÖØÖÃÕÚµ²×´Ì¬
+            _isPlayerBlocked = false;
+            _isPlayerSlacking = false;
             Transform previousPlayer = _detectedPlayer;
             _detectedPlayer = null;
 
-            // »ñÈ¡Í·²¿³¯Ïò£¬Èç¹ûÍ·²¿×ª¶¯±»½ûÓÃ£¬ÔòÊ¹ÓÃÉíÌå³¯Ïò
             Vector3 detectionDirection = _enableHeadTurn ? GetHeadLookDirection() : transform.forward;
-
-            // Ê¹ÓÃOverlapSphere¼ì²â·¶Î§ÄÚµÄËùÓĞÅö×²Ìå
             Collider[] colliders = Physics.OverlapSphere(transform.position, _playerDetectionDistance);
-
-            Debug.Log($"NPC {gameObject.name}: ¼ì²âµ½ {colliders.Length} ¸öÅö×²Ìå"); // µ÷ÊÔĞÅÏ¢
 
             foreach (Collider collider in colliders)
             {
-                // ¼ì²é±êÇ©ÊÇ·ñÆ¥Åä
                 if (collider.CompareTag(_playerTag))
                 {
-                    Debug.Log($"NPC {gameObject.name}: ÕÒµ½Íæ¼Ò {collider.name}"); // µ÷ÊÔĞÅÏ¢
-
                     Vector3 directionToPlayer = (collider.transform.position - transform.position).normalized;
                     float angleToPlayer = Vector3.Angle(detectionDirection, directionToPlayer);
 
-                    Debug.Log($"NPC {gameObject.name}: µ½Íæ¼ÒµÄ½Ç¶È {angleToPlayer:F1}¡ã, ¼ì²â½Ç¶È·¶Î§ {_playerDetectionAngle / 2f:F1}¡ã"); // µ÷ÊÔĞÅÏ¢
-
-                    // ¼ì²éÊÇ·ñÔÚ¼ì²â½Ç¶È·¶Î§ÄÚ
                     if (angleToPlayer <= _playerDetectionAngle / 2f)
                     {
-                        // ´ÓNPCÑÛ²¿Î»ÖÃ·¢ÉäÉäÏßµ½Íæ¼Ò
-                        Vector3 eyePosition = transform.position + Vector3.up * 1.7f; // ¼ÙÉèÑÛ²¿¸ß¶È
-                        Vector3 playerCenter = collider.bounds.center; // Ê¹ÓÃÍæ¼ÒÅö×²ÌåÖĞĞÄ
+                        Vector3 eyePosition = transform.position + Vector3.up * 1.7f;
+                        Vector3 playerCenter = collider.bounds.center;
                         Vector3 rayDirection = (playerCenter - eyePosition).normalized;
                         float distanceToPlayer = Vector3.Distance(eyePosition, playerCenter);
 
-                        Debug.DrawRay(eyePosition, rayDirection * distanceToPlayer, Color.blue, 0.1f); // µ÷ÊÔÉäÏß
+                        Debug.DrawRay(eyePosition, rayDirection * distanceToPlayer, Color.blue, 0.1f);
 
                         RaycastHit hit;
-                        if (Physics.Raycast(eyePosition, rayDirection, out hit, distanceToPlayer, ~0)) // ¼ì²âËùÓĞÍ¼²ã
+                        if (Physics.Raycast(eyePosition, rayDirection, out hit, distanceToPlayer, ~0))
                         {
-                            Debug.Log($"NPC {gameObject.name}: ÉäÏß»÷ÖĞ {hit.collider.name}, ±êÇ©: {hit.collider.tag}"); // µ÷ÊÔĞÅÏ¢
-
-                            // Èç¹ûÉäÏßÊ×ÏÈ»÷ÖĞµÄÊÇÍæ¼Ò£¬ËµÃ÷Ã»ÓĞÕÚµ²
                             if (hit.collider.CompareTag(_playerTag))
                             {
+                                // ç©å®¶æ²¡æœ‰è¢«é˜»æŒ¡
                                 _hasPlayerInSight = true;
                                 _detectedPlayer = collider.transform;
                                 _isPlayerBlocked = false;
 
-                                Debug.Log($"NPC {gameObject.name}: Íæ¼ÒÔÚÊÓÏßÖĞ£¬ÎŞÕÚµ²"); // µ÷ÊÔĞÅÏ¢
+                                // æ£€æŸ¥ç©å®¶æ˜¯å¦åœ¨æ‘¸é±¼å¹¶å¤„ç†æƒ©ç½šï¼ˆä»…é¢†å¯¼å¯ä»¥ï¼‰
+                                CheckPlayerSlackingAndApplyPenalty(collider);
 
-                                // Èç¹ûÖ®Ç°Ã»ÓĞËø¶¨Íæ¼Ò£¬ÏÖÔÚËø¶¨
                                 if (!_isPlayerLocked)
                                 {
                                     LockOntoPlayer(collider.transform);
@@ -557,16 +672,13 @@ namespace Synty.AnimationBaseLocomotion.NPC
                             }
                             else
                             {
-                                // ÉäÏß»÷ÖĞÁËÆäËûÎïÌå£¬¼ì²éÊÇ·ñÎª×èµ²Îï
                                 if (IsBlockingObject(hit.collider))
                                 {
-                                    _hasPlayerInSight = true; // ÄÜ¼ì²âµ½Íæ¼Ò
+                                    // ç©å®¶è¢«é˜»æŒ¡ï¼Œä¸èƒ½è¿›è¡Œæƒ©ç½š
+                                    _hasPlayerInSight = true;
                                     _detectedPlayer = collider.transform;
-                                    _isPlayerBlocked = true; // µ«±»ÕÚµ²ÁË
+                                    _isPlayerBlocked = true;
 
-                                    Debug.Log($"NPC {gameObject.name}: Íæ¼Ò±» {hit.collider.name} ÕÚµ²"); // µ÷ÊÔĞÅÏ¢
-
-                                    // ÈÔÈ»¿ÉÒÔËø¶¨Íæ¼Ò£¬µ«±ê¼ÇÎª±»ÕÚµ²
                                     if (!_isPlayerLocked)
                                     {
                                         LockOntoPlayer(collider.transform);
@@ -580,12 +692,13 @@ namespace Synty.AnimationBaseLocomotion.NPC
                         }
                         else
                         {
-                            // ÉäÏßÃ»ÓĞ»÷ÖĞÈÎºÎ¶«Î÷£¬ËµÃ÷Â·¾¶ÇåÎú
+                            // ç©å®¶æ²¡æœ‰è¢«é˜»æŒ¡
                             _hasPlayerInSight = true;
                             _detectedPlayer = collider.transform;
                             _isPlayerBlocked = false;
 
-                            Debug.Log($"NPC {gameObject.name}: ÉäÏßÎ´»÷ÖĞÈÎºÎÎïÌå£¬Íæ¼Ò¿É¼û"); // µ÷ÊÔĞÅÏ¢
+                            // æ£€æŸ¥ç©å®¶æ˜¯å¦åœ¨æ‘¸é±¼å¹¶å¤„ç†æƒ©ç½šï¼ˆä»…é¢†å¯¼å¯ä»¥ï¼‰
+                            CheckPlayerSlackingAndApplyPenalty(collider);
 
                             if (!_isPlayerLocked)
                             {
@@ -596,27 +709,241 @@ namespace Synty.AnimationBaseLocomotion.NPC
                             break;
                         }
                     }
+                }
+            }
+
+            if (previousPlayer != null && _detectedPlayer == null && _isPlayerLocked)
+            {
+                ReleasePlayerLock();
+            }
+        }
+
+        /// <summary>
+        /// æ£€æŸ¥ç©å®¶æ˜¯å¦åœ¨æ‘¸é±¼å¹¶åº”ç”¨æƒ©ç½šï¼ˆä»…é™é¢†å¯¼ï¼‰
+        /// </summary>
+        /// <param name="playerCollider">ç©å®¶çš„ç¢°æ’ä½“</param>
+        private void CheckPlayerSlackingAndApplyPenalty(Collider playerCollider)
+        {
+            if (!_isLeader || _isPlayerBlocked) return;
+
+            // è·å–ç©å®¶çš„PlayerCharacterStatusç»„ä»¶
+            CharacterStatus characterStatus = playerCollider.GetComponent<CharacterStatus>();
+            if (characterStatus != null && characterStatus.isSlackingAtWork)
+            {
+                _isPlayerSlacking = true;
+
+                // æ£€æŸ¥æƒ©ç½šå†·å´æ—¶é—´
+                if (Time.time - _lastPenaltyTime >= _penaltyCooldown)
+                {
+                    // å°è¯•å¯¹ç©å®¶è¿›è¡Œæƒ©ç½š
+                    bool penaltyApplied = characterStatus.ApplyPenalty();
+
+                    if (penaltyApplied)
+                    {
+                        _lastPenaltyTime = Time.time;
+
+                        if (_enablePenaltyDebug)
+                        {
+                            Debug.Log($"[NPC Leader {gameObject.name}] ğŸš¨ å‘ç°ç©å®¶æ‘¸é±¼ï¼å·²æ‰£å·¥èµ„ï¼");
+                        }
+                    }
+                    else if (_enablePenaltyDebug)
+                    {
+                        Debug.Log($"[NPC Leader {gameObject.name}] âš ï¸ æƒ©ç½šå¤±è´¥ï¼ˆå¯èƒ½å·¥èµ„ä¸è¶³æˆ–å…¶ä»–åŸå› ï¼‰");
+                    }
+                }
+                else if (_enablePenaltyDebug)
+                {
+                    float remainingCooldown = _penaltyCooldown - (Time.time - _lastPenaltyTime);
+                    Debug.Log($"[NPC Leader {gameObject.name}] æƒ©ç½šå†·å´ä¸­ï¼Œå‰©ä½™æ—¶é—´: {remainingCooldown:F1}ç§’");
+                }
+            }
+        }
+
+        /// <summary>
+        /// æ£€æŸ¥æ˜¯å¦å¯ä»¥åº”ç”¨æƒ©ç½š
+        /// </summary>
+        /// <returns>æ˜¯å¦å¯ä»¥æƒ©ç½š</returns>
+        public bool CanApplyPenalty()
+        {
+            return _isLeader && Time.time - _lastPenaltyTime >= _penaltyCooldown;
+        }
+
+        /// <summary>
+        /// è·å–æƒ©ç½šå‰©ä½™å†·å´æ—¶é—´
+        /// </summary>
+        /// <returns>å‰©ä½™å†·å´æ—¶é—´ï¼ˆç§’ï¼‰</returns>
+        public float GetPenaltyRemainingCooldown()
+        {
+            if (!_isLeader) return 0f;
+            float remainingTime = _penaltyCooldown - (Time.time - _lastPenaltyTime);
+            return Mathf.Max(0f, remainingTime);
+        }
+
+        /// <summary>
+        /// é‡ç½®æƒ©ç½šå†·å´æ—¶é—´ï¼ˆç”¨äºè°ƒè¯•ï¼‰
+        /// </summary>
+        public void ResetPenaltyCooldown()
+        {
+            _lastPenaltyTime = -999f;
+            if (_enablePenaltyDebug)
+            {
+                Debug.Log($"[NPC Leader {gameObject.name}] æƒ©ç½šå†·å´æ—¶é—´å·²é‡ç½®");
+            }
+        }
+
+        private bool IsBlockingObject(Collider collider)
+        {
+            int objectLayer = collider.gameObject.layer;
+            return (_blockingLayerMask.value & (1 << objectLayer)) != 0;
+        }
+
+        #endregion
+
+        #region Special Points System
+
+        private void UpdateSpecialPoints()
+        {
+            if (!_enableSpecialPoints || _specialPoints == null || _specialPoints.Length == 0)
+                return;
+
+            // æ›´æ–°å†·å´æ—¶é—´
+            if (_specialPointCooldownRemaining > 0f)
+            {
+                _specialPointCooldownRemaining -= Time.deltaTime;
+                _specialPointCooldownRemaining = Mathf.Max(0f, _specialPointCooldownRemaining);
+            }
+
+            // å¦‚æœå·²ç»åœ¨ç‰¹æ®Šç‚¹ï¼Œæ›´æ–°åœç•™è®¡æ—¶å™¨
+            if (_isAtSpecialPoint && _currentSpecialPoint != null)
+            {
+                _specialPointTimer += Time.deltaTime;
+                if (_specialPointTimer >= _specialPointStayTime)
+                {
+                    StartReturnFromSpecialPoint();
+                }
+            }
+        }
+
+        // æ£€æŸ¥æ˜¯å¦æœ‰ç‰¹æ®Šç‚¹åœ¨æ£€æµ‹èŒƒå›´å†…
+        public Transform GetNearbySpecialPoint()
+        {
+            if (!_enableSpecialPoints || _specialPoints == null || _specialPoints.Length == 0)
+                return null;
+
+            // å¦‚æœå·²ç»åœ¨å¤„ç†ç‰¹æ®Šç‚¹ï¼Œä¸æ£€æŸ¥æ–°çš„
+            if (_isGoingToSpecialPoint || _isAtSpecialPoint)
+                return null;
+
+            // æ£€æŸ¥å†·å´æ—¶é—´
+            if (_specialPointCooldownRemaining > 0f)
+            {
+                return null;
+            }
+
+            foreach (Transform specialPoint in _specialPoints)
+            {
+                if (specialPoint == null) continue;
+
+                float distance = Vector3.Distance(transform.position, specialPoint.position);
+                if (distance <= _specialPointDetectionRange)
+                {
+                    // å¼€å§‹å†·å´æ—¶é—´ï¼ˆæ— è®ºæ¦‚ç‡åˆ¤å®šç»“æœå¦‚ä½•ï¼‰
+                    _specialPointCooldownRemaining = _specialPointCooldownTime;
+                    _lastSpecialPointCheckTime = Time.time;
+
+                    // æ£€æŸ¥æ¦‚ç‡
+                    float randomValue = Random.Range(0f, 1f);
+                    Debug.Log($"NPC {gameObject.name}: ç‰¹æ®Šç‚¹ {specialPoint.name} æ¦‚ç‡åˆ¤å®š: {randomValue:F2} <= {_specialPointActivationChance:F2}ï¼Ÿ");
+
+                    if (randomValue <= _specialPointActivationChance)
+                    {
+                        Debug.Log($"NPC {gameObject.name}: æ¦‚ç‡åˆ¤å®šæˆåŠŸï¼å‰å¾€ç‰¹æ®Šç‚¹ {specialPoint.name}");
+                        return specialPoint;
+                    }
                     else
                     {
-                        Debug.Log($"NPC {gameObject.name}: Íæ¼Ò²»ÔÚ¼ì²â½Ç¶È·¶Î§ÄÚ"); // µ÷ÊÔĞÅÏ¢
+                        Debug.Log($"NPC {gameObject.name}: æ¦‚ç‡åˆ¤å®šå¤±è´¥ï¼Œå†·å´æ—¶é—´ {_specialPointCooldownTime} ç§’");
+                        // å³ä½¿æ¦‚ç‡åˆ¤å®šå¤±è´¥ï¼Œä¹Ÿè¦å¼€å§‹å†·å´æ—¶é—´
+                        break; // è·³å‡ºå¾ªç¯ï¼Œé¿å…æ£€æŸ¥å…¶ä»–ç‰¹æ®Šç‚¹
                     }
                 }
             }
 
-            // Èç¹ûÖ®Ç°¼ì²âµ½Íæ¼Òµ«ÏÖÔÚÃ»ÓĞ£¬ÊÍ·ÅËø¶¨
-            if (previousPlayer != null && _detectedPlayer == null && _isPlayerLocked)
+            return null;
+        }
+
+        // å¼€å§‹å‰å¾€ç‰¹æ®Šç‚¹
+        public void StartGoingToSpecialPoint(Transform specialPoint)
+        {
+            if (specialPoint == null) return;
+
+            _isGoingToSpecialPoint = true;
+            _isAtSpecialPoint = false;
+            _currentSpecialPoint = specialPoint;
+
+            // è®°å½•è¿”å›ä½ç½®
+            if (_isFollowingPath && _waypoints != null && _currentWaypointIndex < _waypoints.Length)
             {
-                ReleasePlayerLock();
-                Debug.Log($"NPC {gameObject.name}: ÊÍ·ÅÍæ¼ÒËø¶¨"); // µ÷ÊÔĞÅÏ¢
+                _returnPosition = _waypoints[_currentWaypointIndex].position;
+                _returnWaypointIndex = _currentWaypointIndex;
+            }
+            else
+            {
+                _returnPosition = transform.position;
+                _returnWaypointIndex = _currentWaypointIndex;
+            }
+
+            Debug.Log($"NPC {gameObject.name}: å¼€å§‹å‰å¾€ç‰¹æ®Šç‚¹ {specialPoint.name}");
+        }
+
+        // åˆ°è¾¾ç‰¹æ®Šç‚¹
+        public void ReachSpecialPoint()
+        {
+            if (!_isGoingToSpecialPoint || _currentSpecialPoint == null) return;
+
+            _isGoingToSpecialPoint = false;
+            _isAtSpecialPoint = true;
+            _specialPointTimer = 0f;
+
+            // æ ‡è®°ä¸ºå·²è®¿é—®
+            _visitedSpecialPoints.Add(_currentSpecialPoint);
+
+            Debug.Log($"NPC {gameObject.name}: åˆ°è¾¾ç‰¹æ®Šç‚¹ {_currentSpecialPoint.name}ï¼Œå¼€å§‹åœç•™ {_specialPointStayTime} ç§’");
+        }
+
+        // å¼€å§‹ä»ç‰¹æ®Šç‚¹è¿”å›
+        public void StartReturnFromSpecialPoint()
+        {
+            if (!_isAtSpecialPoint) return;
+
+            _isAtSpecialPoint = false;
+            _isGoingToSpecialPoint = false;
+
+            Debug.Log($"NPC {gameObject.name}: ä»ç‰¹æ®Šç‚¹ {_currentSpecialPoint.name} è¿”å›åˆ°è·¯å¾„");
+
+            _currentSpecialPoint = null;
+            _specialPointTimer = 0f;
+
+            // æ¢å¤è·¯å¾„è·Ÿéš
+            if (_enablePathFollowing && _waypoints != null && _waypoints.Length > 0)
+            {
+                _currentWaypointIndex = _returnWaypointIndex;
+                _isFollowingPath = true;
             }
         }
 
-        // ĞÂÔö·½·¨£ºÅĞ¶ÏÎïÌåÊÇ·ñÎª×èµ²Îï
-        private bool IsBlockingObject(Collider collider)
+        // æ£€æŸ¥æ˜¯å¦åˆ°è¾¾ç‰¹æ®Šç‚¹
+        public bool IsNearSpecialPoint(Transform specialPoint)
         {
-            // ¼ì²éÍ¼²ãÊÇ·ñÔÚ×èµ²Í¼²ãÕÚÕÖÖĞ
-            int objectLayer = collider.gameObject.layer;
-            return (_blockingLayerMask.value & (1 << objectLayer)) != 0;
+            if (specialPoint == null) return false;
+            return Vector3.Distance(transform.position, specialPoint.position) <= _specialPointReachDistance;
+        }
+
+        // æ£€æŸ¥æ˜¯å¦åˆ°è¾¾è¿”å›ä½ç½®
+        public bool IsNearReturnPosition()
+        {
+            return Vector3.Distance(transform.position, _returnPosition) <= _waypointReachDistance;
         }
 
         #endregion
@@ -641,7 +968,6 @@ namespace Synty.AnimationBaseLocomotion.NPC
         private void SetNextWaypoint()
         {
             if (_waypoints == null || _waypoints.Length == 0) return;
-            // Direct movement to waypoint, no NavMesh needed
         }
 
         private void UpdatePathFollowing()
@@ -670,7 +996,6 @@ namespace Synty.AnimationBaseLocomotion.NPC
             }
             else
             {
-                // Direct movement to waypoint
                 MoveTowards(currentTarget);
             }
         }
@@ -1216,26 +1541,44 @@ namespace Synty.AnimationBaseLocomotion.NPC
         private void BuildBehaviorTree()
         {
             rootNode = new SelectorNode(
-                // Highest priority: Avoid obstacles
+                // æœ€é«˜ä¼˜å…ˆçº§ï¼šé¿å¼€éšœç¢ç‰©
                 new SequenceNode(
                     new ConditionNode(() => npc.HasObstacleAhead),
                     new ActionNode(AvoidObstacle)
                 ),
 
-                // Medium priority: Follow path
+                // ç¬¬äºŒä¼˜å…ˆçº§ï¼šå‰å¾€ç‰¹æ®Šç‚¹
+                new SequenceNode(
+                    new ConditionNode(() => npc.EnableSpecialPoints && !npc.IsGoingToSpecialPoint && !npc.IsAtSpecialPoint),
+                    new ActionNode(CheckForSpecialPoints)
+                ),
+
+                // ç¬¬ä¸‰ä¼˜å…ˆçº§ï¼šç‰¹æ®Šç‚¹è¡Œä¸º
+                new SequenceNode(
+                    new ConditionNode(() => npc.IsGoingToSpecialPoint),
+                    new ActionNode(GoToSpecialPoint)
+                ),
+
+                // ç¬¬å››ä¼˜å…ˆçº§ï¼šåœ¨ç‰¹æ®Šç‚¹åœç•™
+                new SequenceNode(
+                    new ConditionNode(() => npc.IsAtSpecialPoint),
+                    new ActionNode(StayAtSpecialPoint)
+                ),
+
+                // ç¬¬äº”ä¼˜å…ˆçº§ï¼šè·Ÿéšè·¯å¾„
                 new SequenceNode(
                     new ConditionNode(() => npc.EnablePathFollowing && npc.Waypoints != null && npc.Waypoints.Length > 0),
                     new ActionNode(FollowPath)
                 ),
 
-                // Lower priority: Stationary scanning (only when not moving and no path)
+                // ç¬¬å…­ä¼˜å…ˆçº§ï¼šé™æ­¢æ‰«æ
                 new SequenceNode(
                     new ConditionNode(() => !npc.IsMoving &&
                                            (!npc.EnablePathFollowing || npc.Waypoints == null || npc.Waypoints.Length == 0)),
                     new ActionNode(StationaryScanning)
                 ),
 
-                // Lowest priority: Patrol behavior
+                // æœ€ä½ä¼˜å…ˆçº§ï¼šå·¡é€»è¡Œä¸º
                 new ActionNode(PatrolBehavior)
             );
         }
@@ -1243,6 +1586,44 @@ namespace Synty.AnimationBaseLocomotion.NPC
         public void Update()
         {
             rootNode?.Evaluate();
+        }
+
+        private BehaviorNode.NodeState CheckForSpecialPoints()
+        {
+            Transform nearbySpecialPoint = npc.GetNearbySpecialPoint();
+            if (nearbySpecialPoint != null)
+            {
+                npc.StartGoingToSpecialPoint(nearbySpecialPoint);
+                return BehaviorNode.NodeState.Success;
+            }
+            return BehaviorNode.NodeState.Failure;
+        }
+
+        private BehaviorNode.NodeState GoToSpecialPoint()
+        {
+            if (npc.CurrentSpecialPoint == null)
+            {
+                return BehaviorNode.NodeState.Failure;
+            }
+
+            // æ£€æŸ¥æ˜¯å¦åˆ°è¾¾ç‰¹æ®Šç‚¹
+            if (npc.IsNearSpecialPoint(npc.CurrentSpecialPoint))
+            {
+                npc.ReachSpecialPoint();
+                return BehaviorNode.NodeState.Success;
+            }
+
+            // ç»§ç»­å‰å¾€ç‰¹æ®Šç‚¹
+            npc.MoveTowards(npc.CurrentSpecialPoint.position);
+            npc.SetGaitState(NPCAnimationController.NPCGaitState.Walk);
+            return BehaviorNode.NodeState.Running;
+        }
+
+        private BehaviorNode.NodeState StayAtSpecialPoint()
+        {
+            // åœ¨ç‰¹æ®Šç‚¹åœç•™ï¼Œä»€ä¹ˆéƒ½ä¸åš
+            npc.StopMovement();
+            return BehaviorNode.NodeState.Running;
         }
 
         private BehaviorNode.NodeState StationaryScanning()
