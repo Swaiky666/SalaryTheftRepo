@@ -52,8 +52,14 @@ public class TaskManager : MonoBehaviour
     // [SerializeField] private CleanTaskHandler cleanTaskHandler;
     // [SerializeField] private DiscussionTaskHandler discussionTaskHandler;
 
+    [Header("游戏逻辑系统")]
+    [SerializeField] private GameLogicSystem gameLogicSystem; // 游戏逻辑系统引用
+
     [Header("任务设置")]
     [SerializeField] private int maxDailyTasks = 3; // 每日最大任务数量
+
+    [Header("工作进度设置")]
+    [SerializeField] private float workProgressPerTask = 10f; // 每个任务完成增加的工作进度
 
     [Header("调试设置")]
     [SerializeField] private bool enableDebugLog = true; // 启用调试日志
@@ -144,6 +150,22 @@ public class TaskManager : MonoBehaviour
         // 检查任务处理器
         if (printTaskHandler == null)
             Debug.LogWarning("[TaskManager] 打印任务处理器未设置");
+
+        // 检查游戏逻辑系统
+        if (gameLogicSystem == null)
+        {
+            // 尝试自动查找GameLogicSystem
+            gameLogicSystem = FindObjectOfType<GameLogicSystem>();
+            if (gameLogicSystem == null)
+            {
+                Debug.LogWarning("[TaskManager] 游戏逻辑系统未设置且未找到，任务完成将不会增加工作进度");
+            }
+            else
+            {
+                if (enableDebugLog)
+                    Debug.Log("[TaskManager] 自动找到了GameLogicSystem组件");
+            }
+        }
     }
 
     /// <summary>
@@ -280,6 +302,9 @@ public class TaskManager : MonoBehaviour
         TaskData task = dailyTasks[taskIndex];
         task.isCompleted = true;
 
+        // 增加工作进度
+        AddWorkProgressForCompletedTask(task);
+
         // 更新UI
         UpdateTaskUI();
 
@@ -288,6 +313,43 @@ public class TaskManager : MonoBehaviour
 
         // 检查是否所有任务都完成了
         CheckAllTasksCompleted();
+    }
+
+    /// <summary>
+    /// 为完成的任务增加工作进度
+    /// </summary>
+    /// <param name="completedTask">完成的任务</param>
+    private void AddWorkProgressForCompletedTask(TaskData completedTask)
+    {
+        if (gameLogicSystem == null)
+        {
+            if (enableDebugLog)
+                Debug.LogWarning("[TaskManager] GameLogicSystem未设置，无法增加工作进度");
+            return;
+        }
+
+        // 根据任务类型设置不同的进度增加值（可以扩展）
+        float progressAmount = workProgressPerTask;
+
+        // 未来可以根据任务类型设置不同的进度值
+        switch (completedTask.taskType)
+        {
+            case TaskType.Print:
+                progressAmount = workProgressPerTask;
+                break;
+                // case TaskType.Clean:
+                //     progressAmount = workProgressPerTask * 1.2f; // 清理任务可能更有价值
+                //     break;
+                // case TaskType.Discussion:
+                //     progressAmount = workProgressPerTask * 1.5f; // 讨论任务可能最有价值
+                //     break;
+        }
+
+        // 增加工作进度
+        gameLogicSystem.AddWorkProgress(progressAmount);
+
+        if (enableDebugLog)
+            Debug.Log($"[TaskManager] 📈 任务完成增加工作进度: +{progressAmount}% (任务: {completedTask.taskName})");
     }
 
     /// <summary>
@@ -309,6 +371,26 @@ public class TaskManager : MonoBehaviour
         {
             if (enableDebugLog)
                 Debug.Log("[TaskManager] 🎉 所有今日任务已完成！");
+
+            // 可以在这里添加额外的奖励逻辑
+            OnAllTasksCompleted();
+        }
+    }
+
+    /// <summary>
+    /// 所有任务完成时的额外处理
+    /// </summary>
+    private void OnAllTasksCompleted()
+    {
+        // 可以添加额外的奖励，比如额外的工作进度或薪资奖励
+        if (gameLogicSystem != null)
+        {
+            // 给予完成所有任务的奖励
+            float bonusProgress = workProgressPerTask * 0.5f; // 额外50%的进度奖励
+            gameLogicSystem.AddWorkProgress(bonusProgress);
+
+            if (enableDebugLog)
+                Debug.Log($"[TaskManager] 🏆 全部任务完成奖励: +{bonusProgress}% 工作进度");
         }
     }
 
@@ -342,6 +424,8 @@ public class TaskManager : MonoBehaviour
         Debug.Log($"任务库总数: {availableTasks.Count}");
         Debug.Log($"今日任务数: {dailyTasks.Count}");
         Debug.Log($"注册的任务处理器数量: {taskHandlers.Count}");
+        Debug.Log($"GameLogicSystem引用: {(gameLogicSystem != null ? "已设置" : "未设置")}");
+        Debug.Log($"每任务进度增加值: {workProgressPerTask}%");
 
         for (int i = 0; i < dailyTasks.Count; i++)
         {
@@ -349,6 +433,35 @@ public class TaskManager : MonoBehaviour
             string status = task.isCompleted ? "已完成" : "进行中";
             Debug.Log($"任务 {i + 1}: {task.taskName} - 状态: {status} - 类型: {task.taskType} - 显示文本: {task.displayText}");
         }
+    }
+
+    /// <summary>
+    /// 手动完成一个任务（调试用）
+    /// </summary>
+    [ContextMenu("手动完成第一个任务")]
+    public void ManualCompleteFirstTask()
+    {
+        for (int i = 0; i < dailyTasks.Count; i++)
+        {
+            if (!dailyTasks[i].isCompleted)
+            {
+                OnTaskCompleted(i);
+                Debug.Log($"[TaskManager] 手动完成任务: {dailyTasks[i].taskName}");
+                return;
+            }
+        }
+        Debug.Log("[TaskManager] 没有可完成的任务");
+    }
+
+    /// <summary>
+    /// 设置每任务工作进度值（调试用）
+    /// </summary>
+    /// <param name="newValue">新的进度值</param>
+    public void SetWorkProgressPerTask(float newValue)
+    {
+        workProgressPerTask = Mathf.Max(0f, newValue);
+        if (enableDebugLog)
+            Debug.Log($"[TaskManager] 每任务工作进度设置为: {workProgressPerTask}%");
     }
 
     /// <summary>
@@ -363,5 +476,14 @@ public class TaskManager : MonoBehaviour
     {
         if (index < 0 || index >= dailyTasks.Count) return null;
         return dailyTasks[index];
+    }
+
+    /// <summary>
+    /// 获取或设置每任务工作进度值
+    /// </summary>
+    public float WorkProgressPerTask
+    {
+        get => workProgressPerTask;
+        set => workProgressPerTask = Mathf.Max(0f, value);
     }
 }
