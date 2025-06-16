@@ -26,14 +26,16 @@ public class TaskData
     public string displayText;      // 任务完成器显示文本
     public TaskType taskType;       // 任务类型
     public bool isCompleted;        // 是否已完成
+    public bool isRepeatable;       // 是否可重复（用于清理任务等）
 
-    public TaskData(int id, string name, string description, TaskType type, string display = "")
+    public TaskData(int id, string name, string description, TaskType type, string display = "", bool repeatable = false)
     {
         taskId = id;
         taskName = name;
         taskDescription = description;
         taskType = type;
         isCompleted = false;
+        isRepeatable = repeatable;
         displayText = string.IsNullOrEmpty(display) ? description : display;
     }
 }
@@ -48,8 +50,8 @@ public class TaskManager : MonoBehaviour
 
     [Header("任务处理器")]
     [SerializeField] private PrintTaskHandler printTaskHandler; // 打印任务处理器
+    [SerializeField] private CleanTaskHandler cleanTaskHandler; // 清理任务处理器
     // 未来可以添加更多任务处理器
-    // [SerializeField] private CleanTaskHandler cleanTaskHandler;
     // [SerializeField] private DiscussionTaskHandler discussionTaskHandler;
 
     [Header("游戏逻辑系统")]
@@ -72,6 +74,7 @@ public class TaskManager : MonoBehaviour
     // 任务文本常量
     private const string NO_TASK_TEXT = "No Task";
     private const string TASK_COMPLETED_TEXT = "Task Completed";
+    private const string REPEATABLE_COMPLETED_TEXT = "已完成（可重复完成）";
 
     void Start()
     {
@@ -108,8 +111,17 @@ public class TaskManager : MonoBehaviour
                 Debug.Log("[TaskManager] 打印任务处理器已注册");
         }
 
+        // 注册清理任务处理器
+        if (cleanTaskHandler != null)
+        {
+            cleanTaskHandler.Initialize(this);
+            taskHandlers[TaskType.Clean] = cleanTaskHandler;
+
+            if (enableDebugLog)
+                Debug.Log("[TaskManager] 清理任务处理器已注册");
+        }
+
         // 未来可以注册更多处理器
-        // if (cleanTaskHandler != null) { ... }
         // if (discussionTaskHandler != null) { ... }
     }
 
@@ -121,15 +133,20 @@ public class TaskManager : MonoBehaviour
         availableTasks.Clear();
 
         // 添加打印任务到任务库，包含显示文本
-        availableTasks.Add(new TaskData(1, "Print Report", "Print the daily report", TaskType.Print, "Need Report"));
-        availableTasks.Add(new TaskData(2, "Print Manual", "Print instruction manual", TaskType.Print, "Need Manual"));
-        availableTasks.Add(new TaskData(3, "Print Invoice", "Print invoice document", TaskType.Print, "Need Invoice"));
-        availableTasks.Add(new TaskData(4, "Print Contract", "Print contract papers", TaskType.Print, "Need Contract"));
-        availableTasks.Add(new TaskData(5, "Print Schedule", "Print work schedule", TaskType.Print, "Need Schedule"));
+        availableTasks.Add(new TaskData(1, "Print Report", "Print the daily report", TaskType.Print, "Need Report", false));
+        availableTasks.Add(new TaskData(2, "Print Manual", "Print instruction manual", TaskType.Print, "Need Manual", false));
+        availableTasks.Add(new TaskData(3, "Print Invoice", "Print invoice document", TaskType.Print, "Need Invoice", false));
+        availableTasks.Add(new TaskData(4, "Print Contract", "Print contract papers", TaskType.Print, "Need Contract", false));
+        availableTasks.Add(new TaskData(5, "Print Schedule", "Print work schedule", TaskType.Print, "Need Schedule", false));
+
+        // 添加清理任务到任务库（可重复任务）
+        availableTasks.Add(new TaskData(6, "Clean Office", "Clean up the office space", TaskType.Clean, "Clean 5 items", true));
+        availableTasks.Add(new TaskData(7, "Organize Workspace", "Organize and clean workspace", TaskType.Clean, "Clean 5 items", true));
+        availableTasks.Add(new TaskData(8, "Trash Removal", "Remove trash from work area", TaskType.Clean, "Clean 5 items", true));
+        availableTasks.Add(new TaskData(9, "Maintenance Clean", "Perform maintenance cleaning", TaskType.Clean, "Clean 5 items", true));
 
         // 未来可以添加其他类型任务
-        // availableTasks.Add(new TaskData(6, "Clean Office", "Clean the office space", TaskType.Clean, "Clean Area"));
-        // availableTasks.Add(new TaskData(7, "Team Meeting", "Attend team discussion", TaskType.Discussion, "Join Meeting"));
+        // availableTasks.Add(new TaskData(10, "Team Meeting", "Attend team discussion", TaskType.Discussion, "Join Meeting", false));
 
         if (enableDebugLog)
             Debug.Log($"[TaskManager] 任务库已初始化，共 {availableTasks.Count} 个任务");
@@ -150,6 +167,9 @@ public class TaskManager : MonoBehaviour
         // 检查任务处理器
         if (printTaskHandler == null)
             Debug.LogWarning("[TaskManager] 打印任务处理器未设置");
+
+        if (cleanTaskHandler == null)
+            Debug.LogWarning("[TaskManager] 清理任务处理器未设置");
 
         // 检查游戏逻辑系统
         if (gameLogicSystem == null)
@@ -186,7 +206,7 @@ public class TaskManager : MonoBehaviour
         List<TaskData> availableTasksCopy = new List<TaskData>();
         foreach (var task in availableTasks)
         {
-            availableTasksCopy.Add(new TaskData(task.taskId, task.taskName, task.taskDescription, task.taskType, task.displayText));
+            availableTasksCopy.Add(new TaskData(task.taskId, task.taskName, task.taskDescription, task.taskType, task.displayText, task.isRepeatable));
         }
 
         // 随机选择任务，确保不重复
@@ -236,8 +256,17 @@ public class TaskManager : MonoBehaviour
                 TaskData task = dailyTasks[i];
                 if (task.isCompleted)
                 {
-                    taskTexts[i].text = TASK_COMPLETED_TEXT;
-                    taskTexts[i].color = Color.green;
+                    // 根据任务是否可重复设置不同的显示文本和颜色
+                    if (task.isRepeatable)
+                    {
+                        taskTexts[i].text = REPEATABLE_COMPLETED_TEXT;
+                        taskTexts[i].color = Color.cyan; // 青色表示可重复完成
+                    }
+                    else
+                    {
+                        taskTexts[i].text = TASK_COMPLETED_TEXT;
+                        taskTexts[i].color = Color.green; // 绿色表示普通完成
+                    }
                 }
                 else
                 {
@@ -269,10 +298,11 @@ public class TaskManager : MonoBehaviour
         }
 
         TaskData task = dailyTasks[taskIndex];
-        if (task.isCompleted)
+        // 对于可重复任务，即使已完成也可以继续
+        if (task.isCompleted && !task.isRepeatable)
         {
             if (enableDebugLog)
-                Debug.Log($"[TaskManager] 任务已经完成: {task.taskName}");
+                Debug.Log($"[TaskManager] 任务已经完成且不可重复: {task.taskName}");
             return;
         }
 
@@ -300,18 +330,23 @@ public class TaskManager : MonoBehaviour
         if (taskIndex < 0 || taskIndex >= dailyTasks.Count) return;
 
         TaskData task = dailyTasks[taskIndex];
-        task.isCompleted = true;
 
-        // 增加工作进度
-        AddWorkProgressForCompletedTask(task);
+        // 只有在任务未完成时才标记为完成和增加基础工作进度
+        if (!task.isCompleted)
+        {
+            task.isCompleted = true;
+
+            // 增加工作进度（仅在首次完成时）
+            AddWorkProgressForCompletedTask(task);
+        }
 
         // 更新UI
         UpdateTaskUI();
 
         if (enableDebugLog)
-            Debug.Log($"[TaskManager] ✅ 任务完成: {task.taskName}");
+            Debug.Log($"[TaskManager] ✅ 任务完成: {task.taskName} (可重复: {task.isRepeatable})");
 
-        // 检查是否所有任务都完成了
+        // 检查是否所有任务都完成了（仅针对不可重复任务）
         CheckAllTasksCompleted();
     }
 
@@ -337,9 +372,9 @@ public class TaskManager : MonoBehaviour
             case TaskType.Print:
                 progressAmount = workProgressPerTask;
                 break;
-                // case TaskType.Clean:
-                //     progressAmount = workProgressPerTask * 1.2f; // 清理任务可能更有价值
-                //     break;
+            case TaskType.Clean:
+                progressAmount = workProgressPerTask * 1.2f; // 清理任务可能更有价值
+                break;
                 // case TaskType.Discussion:
                 //     progressAmount = workProgressPerTask * 1.5f; // 讨论任务可能最有价值
                 //     break;
@@ -360,27 +395,39 @@ public class TaskManager : MonoBehaviour
         bool allCompleted = true;
         foreach (TaskData task in dailyTasks)
         {
-            if (!task.isCompleted)
+            // 只检查不可重复的任务
+            if (!task.isRepeatable && !task.isCompleted)
             {
                 allCompleted = false;
                 break;
             }
         }
 
-        if (allCompleted && dailyTasks.Count > 0)
+        // 检查是否有任何不可重复的任务
+        bool hasNonRepeatableTasks = false;
+        foreach (TaskData task in dailyTasks)
+        {
+            if (!task.isRepeatable)
+            {
+                hasNonRepeatableTasks = true;
+                break;
+            }
+        }
+
+        if (allCompleted && hasNonRepeatableTasks)
         {
             if (enableDebugLog)
-                Debug.Log("[TaskManager] 🎉 所有今日任务已完成！");
+                Debug.Log("[TaskManager] 🎉 所有不可重复任务已完成！");
 
             // 可以在这里添加额外的奖励逻辑
-            OnAllTasksCompleted();
+            OnAllNonRepeatableTasksCompleted();
         }
     }
 
     /// <summary>
-    /// 所有任务完成时的额外处理
+    /// 所有不可重复任务完成时的额外处理
     /// </summary>
-    private void OnAllTasksCompleted()
+    private void OnAllNonRepeatableTasksCompleted()
     {
         // 可以添加额外的奖励，比如额外的工作进度或薪资奖励
         if (gameLogicSystem != null)
@@ -390,7 +437,7 @@ public class TaskManager : MonoBehaviour
             gameLogicSystem.AddWorkProgress(bonusProgress);
 
             if (enableDebugLog)
-                Debug.Log($"[TaskManager] 🏆 全部任务完成奖励: +{bonusProgress}% 工作进度");
+                Debug.Log($"[TaskManager] 🏆 全部不可重复任务完成奖励: +{bonusProgress}% 工作进度");
         }
     }
 
@@ -431,7 +478,8 @@ public class TaskManager : MonoBehaviour
         {
             TaskData task = dailyTasks[i];
             string status = task.isCompleted ? "已完成" : "进行中";
-            Debug.Log($"任务 {i + 1}: {task.taskName} - 状态: {status} - 类型: {task.taskType} - 显示文本: {task.displayText}");
+            string repeatableInfo = task.isRepeatable ? " (可重复)" : " (一次性)";
+            Debug.Log($"任务 {i + 1}: {task.taskName} - 状态: {status}{repeatableInfo} - 类型: {task.taskType} - 显示文本: {task.displayText}");
         }
     }
 
@@ -443,7 +491,7 @@ public class TaskManager : MonoBehaviour
     {
         for (int i = 0; i < dailyTasks.Count; i++)
         {
-            if (!dailyTasks[i].isCompleted)
+            if (!dailyTasks[i].isCompleted || dailyTasks[i].isRepeatable)
             {
                 OnTaskCompleted(i);
                 Debug.Log($"[TaskManager] 手动完成任务: {dailyTasks[i].taskName}");
@@ -476,6 +524,14 @@ public class TaskManager : MonoBehaviour
     {
         if (index < 0 || index >= dailyTasks.Count) return null;
         return dailyTasks[index];
+    }
+
+    /// <summary>
+    /// 获取任务处理器
+    /// </summary>
+    public ITaskHandler GetTaskHandler(TaskType taskType)
+    {
+        return taskHandlers.ContainsKey(taskType) ? taskHandlers[taskType] : null;
     }
 
     /// <summary>

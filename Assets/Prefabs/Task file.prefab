@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 3737648689988416558}
   m_Layer: 0
   m_Name: Task file
-  m_TagString: Untagged
+  m_TagString: TaskMaterial
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
