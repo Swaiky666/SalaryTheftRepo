@@ -11,6 +11,7 @@ public class TrashBin : MonoBehaviour
     [Header("检测设置")]
     [SerializeField] private float detectionRadius = 0.5f; // 检测半径
     [SerializeField] private float detectionHeight = 1f; // 检测高度
+    [SerializeField] private float startHeightOffset = 0.1f; // 射线起始高度偏移
     [SerializeField] private int rayCount = 8; // 射线数量
     [SerializeField] private float detectionInterval = 0.1f; // 检测间隔（秒）
 
@@ -26,7 +27,16 @@ public class TrashBin : MonoBehaviour
     [Header("调试设置")]
     [SerializeField] private bool enableDebugLog = true; // 启用调试日志
     [SerializeField] private bool showDebugRays = true; // 显示调试射线
+    [SerializeField] private bool showDebugRaysInScene = true; // 在Scene视图中显示射线
     [SerializeField] private Color debugRayColor = Color.yellow; // 调试射线颜色
+    [SerializeField] private Color debugHitColor = Color.red; // 命中时的射线颜色
+    [SerializeField] private float debugRayDuration = 0.1f; // Debug射线持续时间
+
+    [Header("实时状态显示（只读）")]
+    [SerializeField] private int currentDetectedCount = 0; // 当前检测到的垃圾数量
+    [SerializeField] private string lastDetectionTime = ""; // 上次检测时间
+    [SerializeField] private string nearestRubbishName = ""; // 最近的垃圾名称
+    [SerializeField] private float nearestRubbishDistance = 0f; // 最近垃圾距离
 
     // 私有变量
     private SimplifiedCleanSystem cleanSystem; // 清理系统引用
@@ -108,7 +118,7 @@ public class TrashBin : MonoBehaviour
     }
 
     /// <summary>
-    /// 预计算射线方向（圆锥形）
+    /// 预计算射线方向（从垃圾桶内部向上射）
     /// </summary>
     private void CalculateRayDirections()
     {
@@ -119,15 +129,19 @@ public class TrashBin : MonoBehaviour
             float angle = (360f / rayCount) * i;
             float radians = angle * Mathf.Deg2Rad;
 
-            // 在底面圆周上计算点
+            // 计算射线方向：从内部稍微向外向上射
+            // 这样可以检测到投入垃圾桶的垃圾
             Vector3 direction = new Vector3(
-                Mathf.Cos(radians) * detectionRadius,
-                detectionHeight, // 向上的方向
-                Mathf.Sin(radians) * detectionRadius
+                Mathf.Cos(radians) * 0.3f, // 轻微向外
+                1f, // 主要向上
+                Mathf.Sin(radians) * 0.3f  // 轻微向外
             ).normalized;
 
             rayDirections[i] = direction;
         }
+
+        if (enableDebugLog)
+            Debug.Log($"[TrashBin] 已计算 {rayCount} 条射线方向 (从内部向上射)");
     }
 
     /// <summary>
@@ -170,27 +184,65 @@ public class TrashBin : MonoBehaviour
     /// </summary>
     private void PerformRaycastDetection()
     {
-        basePosition = transform.position;
+        // 射线起始位置：垃圾桶位置向上偏移一点点
+        basePosition = transform.position + Vector3.up * startHeightOffset;
+
+        int hitCount = 0; // 用于调试统计
+        float nearestDistance = float.MaxValue;
+        string nearestName = "";
+
+        // 更新检测时间
+        lastDetectionTime = System.DateTime.Now.ToString("HH:mm:ss");
 
         for (int i = 0; i < rayDirections.Length; i++)
         {
             Vector3 worldDirection = transform.TransformDirection(rayDirections[i]);
 
-            // 发射射线
-            if (Physics.Raycast(basePosition, worldDirection, out RaycastHit hit, detectionHeight))
+            // 发射射线（从稍高位置向上射）
+            bool hasHit = Physics.Raycast(basePosition, worldDirection, out RaycastHit hit, detectionHeight);
+
+            // 绘制调试射线（在Game视图中显示）
+            if (showDebugRays)
             {
+                Color rayColor = hasHit ? debugHitColor : debugRayColor;
+                Debug.DrawRay(basePosition, worldDirection * detectionHeight, rayColor, debugRayDuration);
+            }
+
+            if (hasHit)
+            {
+                hitCount++;
+
+                // 更新最近垃圾信息
+                if (hit.distance < nearestDistance)
+                {
+                    nearestDistance = hit.distance;
+                    nearestName = hit.collider.name;
+                }
+
                 // 检查击中的物体是否是垃圾
                 if (hit.collider.CompareTag("Rubbish"))
                 {
+                    if (enableDebugLog)
+                        Debug.Log($"[TrashBin] 射线 {i} 检测到垃圾: {hit.collider.name} 距离: {hit.distance:F2}m");
+
                     ProcessRubbish(hit.collider.gameObject);
                 }
+                else if (enableDebugLog)
+                {
+                    Debug.Log($"[TrashBin] 射线 {i} 击中非垃圾物体: {hit.collider.name} (标签: {hit.collider.tag})");
+                }
             }
+        }
 
-            // 绘制调试射线
-            if (showDebugRays)
-            {
-                Debug.DrawRay(basePosition, worldDirection * detectionHeight, debugRayColor, detectionInterval);
-            }
+        // 更新实时状态
+        currentDetectedCount = hitCount;
+        nearestRubbishName = nearestName;
+        nearestRubbishDistance = nearestDistance == float.MaxValue ? 0f : nearestDistance;
+
+        // 调试信息输出
+        if (enableDebugLog && hitCount > 0)
+        {
+            Debug.Log($"[TrashBin] 检测统计 - 起始位置: {basePosition}, 总射线: {rayDirections.Length}, 命中: {hitCount}, 最近物体: {nearestName} ({nearestDistance:F2}m)");
         }
     }
 
@@ -316,7 +368,44 @@ public class TrashBin : MonoBehaviour
     [ContextMenu("手动检测")]
     public void ManualDetection()
     {
+        if (enableDebugLog)
+            Debug.Log($"[TrashBin] 手动触发检测 - 位置: {transform.position}");
+
         PerformRaycastDetection();
+    }
+
+    /// <summary>
+    /// 测试单条射线（调试用）
+    /// </summary>
+    [ContextMenu("测试单条射线")]
+    public void TestSingleRay()
+    {
+        if (rayDirections == null || rayDirections.Length == 0)
+        {
+            CalculateRayDirections();
+        }
+
+        Vector3 basePos = transform.position;
+        Vector3 worldDir = transform.TransformDirection(rayDirections[0]);
+
+        bool hasHit = Physics.Raycast(basePos, worldDir, out RaycastHit hit, detectionHeight);
+
+        Debug.Log($"[TrashBin] 测试射线结果:");
+        Debug.Log($"  起点: {basePos}");
+        Debug.Log($"  方向: {worldDir}");
+        Debug.Log($"  距离: {detectionHeight}");
+        Debug.Log($"  命中: {hasHit}");
+
+        if (hasHit)
+        {
+            Debug.Log($"  命中物体: {hit.collider.name}");
+            Debug.Log($"  命中位置: {hit.point}");
+            Debug.Log($"  命中距离: {hit.distance:F2}m");
+            Debug.Log($"  物体标签: {hit.collider.tag}");
+        }
+
+        // 绘制测试射线
+        Debug.DrawRay(basePos, worldDir * detectionHeight, Color.magenta, 5f);
     }
 
     /// <summary>
@@ -326,8 +415,8 @@ public class TrashBin : MonoBehaviour
     public void CheckStatus()
     {
         Debug.Log($"[TrashBin] === 垃圾桶 {name} 状态 ===");
-        Debug.Log($"检测半径: {detectionRadius}");
-        Debug.Log($"检测高度: {detectionHeight}");
+        Debug.Log($"检测半径: {detectionRadius}m");
+        Debug.Log($"检测高度: {detectionHeight}m");
         Debug.Log($"射线数量: {rayCount}");
         Debug.Log($"检测间隔: {detectionInterval}秒");
         Debug.Log($"清理系统引用: {(cleanSystem != null ? "已设置" : "未设置")}");
@@ -335,6 +424,20 @@ public class TrashBin : MonoBehaviour
         Debug.Log($"当前检测到的垃圾数量: {detectedRubbish.Count}");
         Debug.Log($"音效组件: {(audioSource != null ? "已设置" : "未设置")}");
         Debug.Log($"特效组件: {(cleanEffect != null ? "已设置" : "未设置")}");
+        Debug.Log($"射线方向已计算: {(rayDirections != null && rayDirections.Length > 0)}");
+
+        // 检查附近的垃圾
+        Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, detectionRadius * 2f);
+        int rubbishCount = 0;
+        foreach (var col in nearbyColliders)
+        {
+            if (col.CompareTag("Rubbish"))
+            {
+                rubbishCount++;
+                Debug.Log($"  附近垃圾: {col.name} 距离: {Vector3.Distance(transform.position, col.transform.position):F2}m");
+            }
+        }
+        Debug.Log($"附近垃圾总数: {rubbishCount}");
     }
 
     /// <summary>
@@ -343,26 +446,37 @@ public class TrashBin : MonoBehaviour
     [ContextMenu("测试特效")]
     public void TestEffect()
     {
+        Debug.Log("[TrashBin] 测试清理特效和音效");
         PlayCleanSound();
         PlayCleanEffect();
     }
 
     /// <summary>
-    /// 在Scene视图中显示检测区域
+    /// 重新计算射线方向（调试用）
+    /// </summary>
+    [ContextMenu("重新计算射线")]
+    public void RecalculateRays()
+    {
+        CalculateRayDirections();
+        Debug.Log($"[TrashBin] 已重新计算 {rayCount} 条射线方向");
+    }
+
+    /// <summary>
+    /// 在Scene视图中显示检测区域（无论是否运行都显示）
     /// </summary>
     void OnDrawGizmosSelected()
     {
-        if (!showDebugRays) return;
+        if (!showDebugRaysInScene) return;
 
-        // 显示检测范围
-        Gizmos.color = Color.cyan;
         Vector3 basePos = transform.position;
+        Vector3 rayStartPos = basePos + Vector3.up * startHeightOffset;
 
-        // 绘制检测圆柱体的轮廓
-        Gizmos.DrawWireSphere(basePos, detectionRadius);
-        Gizmos.DrawWireSphere(basePos + Vector3.up * detectionHeight, detectionRadius);
+        // 显示垃圾桶本体（圆柱形轮廓）
+        Gizmos.color = Color.cyan;
+        DrawWireCircle(basePos, detectionRadius, 16);
+        DrawWireCircle(basePos + Vector3.up * detectionHeight, detectionRadius, 16);
 
-        // 绘制垂直线
+        // 绘制垂直线连接上下圆
         for (int i = 0; i < 8; i++)
         {
             float angle = (360f / 8) * i;
@@ -375,15 +489,85 @@ public class TrashBin : MonoBehaviour
             Gizmos.DrawLine(point, point + Vector3.up * detectionHeight);
         }
 
-        // 显示射线方向
-        if (Application.isPlaying && rayDirections != null)
+        // 显示射线起始位置
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(rayStartPos, 0.05f);
+        Gizmos.DrawLine(basePos, rayStartPos);
+
+        // 显示射线方向（无论是否运行都显示）
+        if (rayDirections != null && rayDirections.Length > 0)
         {
+            // 运行时显示实际射线
             Gizmos.color = debugRayColor;
-            foreach (var direction in rayDirections)
+            for (int i = 0; i < rayDirections.Length; i++)
             {
-                Vector3 worldDir = transform.TransformDirection(direction);
-                Gizmos.DrawRay(basePos, worldDir * detectionHeight);
+                Vector3 worldDir = transform.TransformDirection(rayDirections[i]);
+                Gizmos.DrawRay(rayStartPos, worldDir * detectionHeight);
+
+                // 在射线末端画个小球
+                Vector3 endPoint = rayStartPos + worldDir * detectionHeight;
+                Gizmos.DrawWireSphere(endPoint, 0.03f);
             }
+        }
+        else
+        {
+            // 编辑时显示预览射线
+            Gizmos.color = Color.yellow;
+            for (int i = 0; i < rayCount; i++)
+            {
+                float angle = (360f / rayCount) * i;
+                float radians = angle * Mathf.Deg2Rad;
+
+                Vector3 direction = new Vector3(
+                    Mathf.Cos(radians) * 0.3f,
+                    1f,
+                    Mathf.Sin(radians) * 0.3f
+                ).normalized;
+
+                Vector3 worldDir = transform.TransformDirection(direction);
+                Gizmos.DrawRay(rayStartPos, worldDir * detectionHeight);
+
+                // 射线末端小球
+                Vector3 endPoint = rayStartPos + worldDir * detectionHeight;
+                Gizmos.DrawWireSphere(endPoint, 0.03f);
+            }
+        }
+
+        // 显示中心轴
+        Gizmos.color = Color.green;
+        Gizmos.DrawLine(basePos, basePos + Vector3.up * detectionHeight);
+
+        // 显示检测信息标签
+        Gizmos.color = Color.white;
+        Vector3 labelPos = basePos + Vector3.up * (detectionHeight + 0.2f);
+        Gizmos.DrawWireCube(labelPos, Vector3.one * 0.1f);
+
+        // 在Scene视图中显示文字信息（如果可能）
+#if UNITY_EDITOR
+        UnityEditor.Handles.color = Color.white;
+        UnityEditor.Handles.Label(labelPos + Vector3.up * 0.2f,
+            $"检测范围\n半径: {detectionRadius:F1}m\n高度: {detectionHeight:F1}m\n射线: {rayCount}条\n起始偏移: {startHeightOffset:F2}m");
+#endif
+    }
+
+    /// <summary>
+    /// 绘制圆形辅助方法
+    /// </summary>
+    private void DrawWireCircle(Vector3 center, float radius, int segments)
+    {
+        float angleStep = 360f / segments;
+        Vector3 prevPoint = center + new Vector3(radius, 0, 0);
+
+        for (int i = 1; i <= segments; i++)
+        {
+            float angle = angleStep * i * Mathf.Deg2Rad;
+            Vector3 newPoint = center + new Vector3(
+                Mathf.Cos(angle) * radius,
+                0,
+                Mathf.Sin(angle) * radius
+            );
+            Gizmos.DrawLine(prevPoint, newPoint);
+            prevPoint = newPoint;
         }
     }
 
