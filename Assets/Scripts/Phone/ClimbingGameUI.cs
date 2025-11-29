@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using System.Collections.Generic;
 
 /// <summary>
@@ -23,7 +24,6 @@ public class ClimbingGameUI : MonoBehaviour
     [SerializeField] private Image platformPrefab; // 平台预制体
 
     [Header("角色设置")]
-    [SerializeField] private float moveSpeed = 800f; // 水平移动速度
     [SerializeField] private float characterRadius = 2.5f; // 角色碰撞半径
 
     [Header("平台设置")]
@@ -37,12 +37,34 @@ public class ClimbingGameUI : MonoBehaviour
     [SerializeField] private float platformDownDuration = 0.2f; // 下降持续时间
 
     [Header("平台生成逻辑")]
-    [SerializeField] private float spawnDistanceThreshold = 150f; // 上方平台距离屏幕上边界多远时生成新平台
+    [SerializeField] private float initialPlatformYOffset = -150f; // 初始平台的Y偏移（负数表示在玩家下方）
+    [SerializeField] private float platformHeightGap = 100f; // 平台之间的固定高度间隔
+    [SerializeField] private float platformSpawnXRange = 80f; // 平台X位置的随机范围（±多少像素）
     [SerializeField] private float platformDisappearDistance = 100f; // 平台超出屏幕上方多远时删除
     [SerializeField] private float bottomDisappearDistance = 100f; // 平台低于屏幕下方多远时删除
 
+    [Header("Mask效果设置")]
+    [SerializeField] private bool enablePlatformMask = true; // 是否启用平台Mask效果
+    [SerializeField] private float maskTopDistance = 100f; // 超出屏幕上方多远时隐藏（Mask）
+    [SerializeField] private float maskBottomDistance = 100f; // 低于屏幕下方多远时隐藏（Mask）
+
+    [Header("平台触发生成设置")]
+    [SerializeField] private bool useTriggerSpawning = true; // 是否使用触发式生成（而不是每帧生成）
+    [SerializeField] private float triggerSpawnLookaheadDistance = 300f; // 向上预生成平台的距离（基于消失限制）
+
     [Header("游戏设置")]
     [SerializeField] private PhoneShakeDetector phoneDetector;
+
+    [Header("分数系统")]
+    [SerializeField] private bool enableScoreSystem = true; // 是否启用分数系统
+    [SerializeField] private TextMeshProUGUI scoreText; // 分数显示的TMP Text（在Inspector中指定）
+    [SerializeField] private float scoreDisplayScale = 1f; // 分数显示倍数（可显示为整数）
+
+    [Header("动态难度")]
+    [SerializeField] private bool enableDynamicSpeed = true; // 是否启用动态速度调整
+    [SerializeField] private float basePlatformUpSpeed = 50f; // 基础平台上升速度
+    [SerializeField] private float speedIncreasePerScore = 0.05f; // 每100分增加的速度值
+    [SerializeField] private float maxPlatformUpSpeed = 200f; // 最大平台上升速度限制
 
     [Header("调试")]
     [SerializeField] private bool showDebugInfo = true;
@@ -71,6 +93,9 @@ public class ClimbingGameUI : MonoBehaviour
     // 游戏状态
     private int platformsTouched = 0;
     private float highestY = 0f;
+    private float currentScore = 0f; // 当前分数（基于平台升过的距离）
+    private float finalScore = 0f; // 最终分数（历史最高分，取绝对值）
+    private float currentDynamicSpeed = 0f; // 当前的动态速度
 
     // 游戏结束
     private bool isGameOverAnimating = false;
@@ -134,32 +159,65 @@ public class ClimbingGameUI : MonoBehaviour
         // 3. 检测碰撞（触碰平台）
         DetectPlatformCollision();
 
-        // 4. 基于上方追踪平台生成新平台
-        SpawnNewPlatformsBasedOnTracking();
+        // 4. 基于生成模式生成新平台
+        // 如果使用触发生成模式，则在碰撞时生成，否则每帧生成
+        if (!useTriggerSpawning)
+        {
+            SpawnNewPlatformsBasedOnTracking();
+        }
 
-        // 5. 清理超出范围的平台
+        // 5. 更新平台Mask效果（透明度）
+        UpdatePlatformMask();
+
+        // 6. 清理超出范围的平台
         CleanupPlatforms();
 
-        // 6. 更新追踪平台索引
+        // 7. 更新追踪平台索引
         UpdateTrackedPlatformIndices();
 
-        // 7. 检查游戏失败条件
+        // 8. 更新分数和动态难度
+        UpdateScore();
+        UpdateDynamicSpeed();
+
+        // 9. 检查游戏失败条件
         CheckGameFailCondition();
     }
 
     /// <summary>
-    /// 处理角色水平移动（根据手机倾斜）
+    /// 处理角色水平移动（根据手机倾斜角度）
+    /// 
+    /// 倾斜映射：
+    /// - xRotation = -90°：人物静止不动（中立位置）
+    /// - xRotation = -45°：向右最大速度
+    /// - xRotation = -135°：向左最大速度
     /// </summary>
     private void HandleCharacterMovement()
     {
+        // 获取倾斜输入（-1到1）
         float tiltInput = phoneDetector.GetTiltInput();
+
+        // 计算移动方向和速度
+        // tiltInput范围：-1（向左最快）到 1（向右最快）
         float targetX = tiltInput * (gameAreaWidth / 2f - characterRadius);
+
+        // 限制角色在屏幕范围内
         targetX = Mathf.Clamp(targetX, -gameAreaWidth / 2f + characterRadius, gameAreaWidth / 2f - characterRadius);
-        
-        characterPosition.x = Mathf.Lerp(characterPosition.x, targetX, moveSpeed * Time.deltaTime / 1000f);
-        characterPosition.y = 0f; // Y始终锁定在0
-        
+
+        // 使用Lerp平滑移动（可选，根据需要调整）
+        // 更大的时间系数会使移动更快反应倾斜变化
+        float moveResponseTime = 0.1f; // 移动响应时间（秒）
+        characterPosition.x = Mathf.Lerp(characterPosition.x, targetX, Time.deltaTime / moveResponseTime);
+
+        // Y轴始终锁定在屏幕中心
+        characterPosition.y = 0f;
+
         characterRect.anchoredPosition = characterPosition;
+
+        if (showDebugInfo)
+        {
+            // 在Update中打印一次（避免过度输出）
+            // Debug.Log($"[ClimbingGameUI] 倾斜输入: {tiltInput:F3}, 角色X: {characterPosition.x:F2}");
+        }
     }
 
     /// <summary>
@@ -184,29 +242,38 @@ public class ClimbingGameUI : MonoBehaviour
         }
         else
         {
-            // 平台持续向上升
-            platformsCurrentY += platformUpSpeed * Time.deltaTime;
+            // 平台持续向上升（使用动态速度或基础速度）
+            float currentSpeed = enableDynamicSpeed ? currentDynamicSpeed : platformUpSpeed;
+            platformsCurrentY += currentSpeed * Time.deltaTime;
         }
 
         highestY = Mathf.Max(highestY, platformsCurrentY);
 
-        // 应用位置到所有平台
+        // 应用位置到所有平台（保留X位置，只更新Y位置）
         for (int i = 0; i < activePlatforms.Count; i++)
         {
             if (activePlatforms[i] == null) continue;
             
             float finalY = platformsCurrentY + platformSpawnY[i];
-            activePlatforms[i].anchoredPosition = new Vector2(0, finalY);
+            Vector2 currentPos = activePlatforms[i].anchoredPosition;
+            activePlatforms[i].anchoredPosition = new Vector2(currentPos.x, finalY);
         }
 
-        // 更新上方追踪平台距离屏幕上边界的距离
-        if (topTrackedPlatformIndex >= 0 && topTrackedPlatformIndex < activePlatforms.Count)
+        // 更新最高平台距离屏幕上边界的距离（用于监控游戏进度）
+        if (activePlatforms.Count > 0)
         {
-            RectTransform trackedPlatform = activePlatforms[topTrackedPlatformIndex];
-            if (trackedPlatform != null)
+            float highestPlatformY = float.MinValue;
+            foreach (var platform in activePlatforms)
             {
-                float platformTopY = trackedPlatform.anchoredPosition.y + platformHeight / 2f;
-                // 屏幕上边界是gameAreaHeight/2，所以距离 = 上边界 - 平台顶部
+                if (platform != null)
+                {
+                    highestPlatformY = Mathf.Max(highestPlatformY, platform.anchoredPosition.y);
+                }
+            }
+            
+            if (highestPlatformY > float.MinValue)
+            {
+                float platformTopY = highestPlatformY + platformHeight / 2f;
                 distanceToTopBoundary = (gameAreaHeight / 2f) - platformTopY;
             }
         }
@@ -246,6 +313,13 @@ public class ClimbingGameUI : MonoBehaviour
                 {
                     Debug.Log($"[ClimbingGameUI] 接触平台 {i}！已触碰总数: {platformsTouched}");
                 }
+
+                // 如果启用触发生成模式，在触碰平台时生成新平台
+                if (useTriggerSpawning)
+                {
+                    GeneratePlatformBatch();
+                }
+
                 break;
             }
         }
@@ -265,44 +339,71 @@ public class ClimbingGameUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 基于上方追踪平台生成新平台
+    /// 基于下方追踪平台生成新平台
     /// 
     /// 逻辑：
-    /// - 监控上方追踪平台到屏幕上边界的距离
-    /// - 当距离大于阈值时，在屏幕顶部生成新平台
-    /// - 新平台会在后续的UpdateTrackedPlatformIndices中成为新的上方追踪平台
+    /// - 监控下方追踪平台的位置
+    /// - 在其上方固定距离（platformHeightGap）处生成新平台
+    /// - 新平台的X位置在指定范围内随机
+    /// - 新平台Y位置 = 下方平台Y + platformHeightGap
     /// </summary>
     private void SpawnNewPlatformsBasedOnTracking()
     {
-        // 需要至少有一个被追踪的平台
-        if (topTrackedPlatformIndex < 0 || topTrackedPlatformIndex >= activePlatforms.Count)
+        // 需要至少有一个下方追踪平台
+        if (bottomTrackedPlatformIndex < 0 || bottomTrackedPlatformIndex >= activePlatforms.Count)
             return;
 
-        // 当距离大于阈值时，生成新平台
-        if (distanceToTopBoundary > spawnDistanceThreshold)
+        RectTransform bottomPlatform = activePlatforms[bottomTrackedPlatformIndex];
+        if (bottomPlatform == null)
+            return;
+
+        // 获取下方追踪平台的Y位置
+        float bottomPlatformY = bottomPlatform.anchoredPosition.y;
+        
+        // 计算新平台应该生成的Y位置（在下方平台上方固定距离）
+        float newPlatformY = bottomPlatformY + platformHeightGap;
+        
+        // 检查是否已经有平台在接近这个位置
+        bool platformAlreadyExists = false;
+        foreach (var platform in activePlatforms)
         {
-            // 新平台在屏幕顶部生成
-            float spawnPositionY = gameAreaHeight / 2f - platformHeight / 2f; // 屏幕顶部边缘
+            if (platform != null && Mathf.Abs(platform.anchoredPosition.y - newPlatformY) < 5f)
+            {
+                platformAlreadyExists = true;
+                break;
+            }
+        }
+        
+        // 如果不存在平台在该位置，则生成（无位置限制，可以无限生成）
+        if (!platformAlreadyExists)
+        {
+            // 随机生成X位置（在指定范围内）
+            float randomXOffset = Random.Range(-platformSpawnXRange, platformSpawnXRange);
             
-            SpawnPlatform(spawnPositionY);
+            // 限制X位置在屏幕范围内
+            float newPlatformX = Mathf.Clamp(randomXOffset, 
+                                             -gameAreaWidth / 2f + platformWidth / 2f,
+                                             gameAreaWidth / 2f - platformWidth / 2f);
+            
+            SpawnPlatformAtPosition(newPlatformX, newPlatformY);
 
             if (showDebugInfo)
             {
-                Debug.Log($"[ClimbingGameUI] 生成新平台！距离: {distanceToTopBoundary:F2} > 阈值: {spawnDistanceThreshold}");
+                Debug.Log($"[ClimbingGameUI] 在下方平台{bottomTrackedPlatformIndex}上方生成新平台！位置: ({newPlatformX:F2}, {newPlatformY:F2})");
             }
         }
     }
 
     /// <summary>
-    /// 生成新平台
+    /// 在指定位置生成新平台
     /// </summary>
-    private void SpawnPlatform(float spawnWorldY)
+    private void SpawnPlatformAtPosition(float spawnX, float spawnWorldY)
     {
         if (platformPrefab == null || platformContainer == null)
             return;
 
         RectTransform newPlatform = Instantiate(platformPrefab, platformContainer).GetComponent<RectTransform>();
-        newPlatform.anchoredPosition = new Vector2(0, spawnWorldY);
+        newPlatform.anchoredPosition = new Vector2(spawnX, spawnWorldY);
         newPlatform.sizeDelta = new Vector2(platformWidth, platformHeight);
         
         Image platformImage = newPlatform.GetComponent<Image>();
@@ -312,10 +413,164 @@ public class ClimbingGameUI : MonoBehaviour
         }
 
         // 记录平台信息
-        // 注意：这里spawnWorldY已经包含了当前的platformsCurrentY偏移
-        // 所以initialY = spawnWorldY - platformsCurrentY
         activePlatforms.Add(newPlatform);
         platformSpawnY.Add(spawnWorldY - platformsCurrentY);
+    }
+
+    /// <summary>
+    /// 批量生成平台（触发式生成模式）
+    /// 
+    /// 逻辑：
+    /// 1. 从上方追踪平台开始
+    /// 2. 持续生成新平台，直到最上方的平台高度超过消失距离
+    /// 3. 每次生成时检查：当前平台Y + platformHeightGap 是否仍在消失距离限制内
+    /// 4. 如果是，继续生成；否则停止
+    /// </summary>
+    private void GeneratePlatformBatch()
+    {
+        if (topTrackedPlatformIndex < 0 || topTrackedPlatformIndex >= activePlatforms.Count)
+            return;
+
+        RectTransform topPlatform = activePlatforms[topTrackedPlatformIndex];
+        if (topPlatform == null)
+            return;
+
+        float currentTopPlatformY = topPlatform.anchoredPosition.y;
+        float screenTopBoundary = gameAreaHeight / 2f;
+        
+        // 继续生成平台，直到最高平台的高度距离超过消失距离
+        bool shouldContinueSpawning = true;
+        int generationCount = 0;
+        const int maxGenerationPerBatch = 20; // 防止无限循环
+
+        while (shouldContinueSpawning && generationCount < maxGenerationPerBatch)
+        {
+            // 计算下一个平台的Y位置
+            float nextPlatformY = currentTopPlatformY + platformHeightGap;
+
+            // 检查下一个平台是否会超出消失距离
+            float distanceAboveScreen = nextPlatformY - screenTopBoundary;
+            
+            // 如果新平台的位置超过消失距离限制，停止生成
+            if (distanceAboveScreen > platformDisappearDistance)
+            {
+                shouldContinueSpawning = false;
+                break;
+            }
+
+            // 检查该位置是否已有平台
+            bool platformAlreadyExists = false;
+            foreach (var platform in activePlatforms)
+            {
+                if (platform != null && Mathf.Abs(platform.anchoredPosition.y - nextPlatformY) < 5f)
+                {
+                    platformAlreadyExists = true;
+                    break;
+                }
+            }
+
+            if (!platformAlreadyExists)
+            {
+                // 随机生成X位置
+                float randomXOffset = Random.Range(-platformSpawnXRange, platformSpawnXRange);
+                
+                // 限制X位置在屏幕范围内
+                float newPlatformX = Mathf.Clamp(randomXOffset, 
+                                                 -gameAreaWidth / 2f + platformWidth / 2f,
+                                                 gameAreaWidth / 2f - platformWidth / 2f);
+                
+                SpawnPlatformAtPosition(newPlatformX, nextPlatformY);
+
+                if (showDebugInfo)
+                {
+                    Debug.Log($"[ClimbingGameUI] 批量生成平台！位置: ({newPlatformX:F2}, {nextPlatformY:F2})，距屏幕顶部: {distanceAboveScreen:F2}");
+                }
+
+                currentTopPlatformY = nextPlatformY;
+                generationCount++;
+            }
+            else
+            {
+                // 如果该位置已有平台，尝试下一个位置
+                currentTopPlatformY = nextPlatformY;
+            }
+        }
+
+        // 更新顶部追踪平台
+        if (topTrackedPlatformIndex >= 0 && topTrackedPlatformIndex < activePlatforms.Count)
+        {
+            topTrackedPlatformIndex = activePlatforms.Count - 1; // 指向最新生成的平台
+        }
+
+        if (showDebugInfo && generationCount > 0)
+        {
+            Debug.Log($"[ClimbingGameUI] 本次生成了 {generationCount} 个平台");
+        }
+    }
+
+    /// <summary>
+    /// 更新平台的Mask效果（透明度）
+    /// 
+    /// 根据平台是否超出视觉范围来调整其透明度：
+    /// 1. 超出屏幕上方maskTopDistance距离 → 完全透明
+    /// 2. 在maskTopDistance范围内 → 逐渐显示
+    /// 3. 在屏幕范围内 → 完全不透明
+    /// 4. 低于屏幕下方maskBottomDistance距离 → 完全透明
+    /// 5. 在maskBottomDistance范围内 → 逐渐隐藏
+    /// </summary>
+    private void UpdatePlatformMask()
+    {
+        if (!enablePlatformMask)
+            return;
+
+        float screenTopBoundary = gameAreaHeight / 2f;
+        float screenBottomBoundary = -gameAreaHeight / 2f;
+
+        for (int i = 0; i < activePlatforms.Count; i++)
+        {
+            if (activePlatforms[i] == null)
+                continue;
+
+            Image platformImage = activePlatforms[i].GetComponent<Image>();
+            if (platformImage == null)
+                continue;
+
+            Vector2 platformPos = activePlatforms[i].anchoredPosition;
+            float platformY = platformPos.y;
+            Color platformColor = platformImage.color;
+
+            // 计算平台距离屏幕边界的距离
+            float distanceAboveScreen = platformY - screenTopBoundary;
+            float distanceBelowScreen = screenBottomBoundary - platformY;
+
+            float alpha = 1f; // 默认完全不透明
+
+            // 检查是否超出屏幕上方
+            if (distanceAboveScreen > maskTopDistance)
+            {
+                alpha = 0f; // 完全隐藏
+            }
+            else if (distanceAboveScreen > 0)
+            {
+                // 在Mask范围内，逐渐显示
+                alpha = 1f - (distanceAboveScreen / maskTopDistance);
+            }
+
+            // 检查是否超出屏幕下方
+            else if (distanceBelowScreen > maskBottomDistance)
+            {
+                alpha = 0f; // 完全隐藏
+            }
+            else if (distanceBelowScreen > 0)
+            {
+                // 在Mask范围内，逐渐隐藏
+                alpha = 1f - (distanceBelowScreen / maskBottomDistance);
+            }
+
+            // 应用透明度
+            platformColor.a = Mathf.Clamp01(alpha);
+            platformImage.color = platformColor;
+        }
     }
 
     /// <summary>
@@ -501,6 +756,9 @@ public class ClimbingGameUI : MonoBehaviour
         platformsCurrentY = 0f;
         isPlatformDecelerating = false;
         distanceToTopBoundary = 0f;
+        currentScore = 0f; // 重置当前分数
+        finalScore = 0f; // 重置最终分数
+        currentDynamicSpeed = basePlatformUpSpeed; // 重置动态速度
 
         characterPosition = Vector2.zero;
         characterRect.anchoredPosition = characterPosition;
@@ -511,7 +769,7 @@ public class ClimbingGameUI : MonoBehaviour
         if (platformPrefab != null && platformContainer != null)
         {
             RectTransform initialPlatform = Instantiate(platformPrefab, platformContainer).GetComponent<RectTransform>();
-            initialPlatform.anchoredPosition = new Vector2(0, 0); // 玩家正下方
+            initialPlatform.anchoredPosition = new Vector2(0, initialPlatformYOffset); // 玩家下方，偏移量可在Inspector调整
             initialPlatform.sizeDelta = new Vector2(platformWidth, platformHeight);
             
             Image platformImage = initialPlatform.GetComponent<Image>();
@@ -521,17 +779,22 @@ public class ClimbingGameUI : MonoBehaviour
             }
 
             activePlatforms.Add(initialPlatform);
-            platformSpawnY.Add(0f);
+            platformSpawnY.Add(initialPlatformYOffset);
 
             // 初始化追踪
             topTrackedPlatformIndex = 0;
             bottomTrackedPlatformIndex = 0;
-            // 初始距离 = 屏幕上边界 - 初始平台顶部 = gameAreaHeight/2 - platformHeight/2
             distanceToTopBoundary = gameAreaHeight / 2f - platformHeight / 2f;
 
             if (showDebugInfo)
             {
-                Debug.Log($"[ClimbingGameUI] 游戏已重启！初始距离到上边界: {distanceToTopBoundary:F2}");
+                Debug.Log($"[ClimbingGameUI] 游戏已重启！初始平台Y: {initialPlatformYOffset:F2}, 平台高度间隔: {platformHeightGap:F2}");
+            }
+
+            // 如果启用触发生成，游戏开始时生成一批初始平台
+            if (useTriggerSpawning)
+            {
+                GeneratePlatformBatch();
             }
         }
     }
@@ -603,8 +866,73 @@ public class ClimbingGameUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 处理游戏结束的红屏闪烁动画
+    /// 创建分数显示UI
     /// </summary>
+
+    /// <summary>
+    /// 更新分数显示（显示平台一共向上升的距离）
+    /// 分数 = platformsCurrentY，代表平台总共向上升过多少，也就是玩家总共下降了多少（绝对值）
+    /// 分数从 0 开始，随着游戏进行持续增加，游戏重启时重置为 0
+    /// 直接更新 Inspector 中指定的 TextMeshProUGUI 组件
+    /// </summary>
+    private void UpdateScore()
+    {
+        if (!enableScoreSystem)
+            return;
+
+        // 分数 = platformsCurrentY（平台向上升的总距离）
+        currentScore = platformsCurrentY;
+
+        // 计算当前分数的绝对值
+        float absoluteScore = Mathf.Abs(currentScore);
+
+        // 判断当前分数的绝对值是否高于最终分数
+        // 如果高于，更新最终分数；否则保持最终分数不变
+        if (absoluteScore > finalScore)
+        {
+            finalScore = absoluteScore;
+        }
+
+        // 更新分数UI显示（显示最终分数，而不是当前分数）
+        if (scoreText != null)
+        {
+            // 根据scoreDisplayScale显示分数（可以用来放大或缩小显示的数字）
+            int displayScore = Mathf.RoundToInt(finalScore * scoreDisplayScale);
+            scoreText.text = $"score: {displayScore}";
+        }
+    }
+
+    /// <summary>
+    /// 更新动态平台上升速度
+    /// 
+    /// 逻辑：
+    /// currentSpeed = basePlatformUpSpeed + (currentScore / 100) * speedIncreasePerScore
+    /// 例如：
+    ///   score = 0：speed = 50
+    ///   score = 100：speed = 50 + 0.05 = 50.05
+    ///   score = 1000：speed = 50 + 0.5 = 50.5
+    ///   score = 10000：speed = 50 + 5 = 55
+    /// </summary>
+    private void UpdateDynamicSpeed()
+    {
+        if (!enableDynamicSpeed)
+        {
+            currentDynamicSpeed = platformUpSpeed;
+            return;
+        }
+
+        // 计算速度增幅
+        float speedIncrease = (currentScore / 100f) * speedIncreasePerScore;
+        currentDynamicSpeed = basePlatformUpSpeed + speedIncrease;
+
+        // 限制最大速度
+        currentDynamicSpeed = Mathf.Min(currentDynamicSpeed, maxPlatformUpSpeed);
+
+        if (showDebugInfo && Mathf.FloorToInt(currentScore) % 500 == 0)
+        {
+            Debug.Log($"[ClimbingGameUI] 分数: {currentScore:F0}, 速度: {currentDynamicSpeed:F2} px/s");
+        }
+    }
     private void HandleGameOverAnimation()
     {
         if (gameOverFlashImage == null)
@@ -652,8 +980,9 @@ public class ClimbingGameUI : MonoBehaviour
             GUILayout.Label("=== 追踪信息 ===");
             GUILayout.Label($"上方追踪索引: {topTrackedPlatformIndex}");
             GUILayout.Label($"下方追踪索引: {bottomTrackedPlatformIndex}");
-            GUILayout.Label($"到上边界距离: {distanceToTopBoundary:F2}");
-            GUILayout.Label($"生成阈值: {spawnDistanceThreshold:F2}");
+            GUILayout.Label($"最高平台到上边界: {distanceToTopBoundary:F2}");
+            GUILayout.Label($"平台高度间隔: {platformHeightGap:F2}");
+            GUILayout.Label($"平台X位置范围: ±{platformSpawnXRange:F2}");
             
             GUILayout.Space(5);
             GUILayout.Label("=== 状态信息 ===");
@@ -756,7 +1085,9 @@ public class ClimbingGameUI : MonoBehaviour
         Debug.Log($"激活平台数: {activePlatforms.Count}");
         Debug.Log($"上方追踪索引: {topTrackedPlatformIndex}");
         Debug.Log($"下方追踪索引: {bottomTrackedPlatformIndex}");
-        Debug.Log($"到上边界距离: {distanceToTopBoundary:F2}");
+        Debug.Log($"最高平台到上边界: {distanceToTopBoundary:F2}");
+        Debug.Log($"平台高度间隔: {platformHeightGap:F2}");
+        Debug.Log($"平台X随机范围: ±{platformSpawnXRange:F2}");
         Debug.Log($"角色位置: ({characterPosition.x:F1}, {characterPosition.y:F1})");
         Debug.Log($"平台Y偏移: {platformsCurrentY:F1}");
         Debug.Log($"触碰平台数: {platformsTouched}");
