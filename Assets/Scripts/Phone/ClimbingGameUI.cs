@@ -630,7 +630,7 @@ public class ClimbingGameUI : MonoBehaviour
     private void UpdateTrackedPlatformIndices()
     {
         // 更新上方追踪平台索引
-        if (topTrackedPlatformIndex >= activePlatforms.Count || activePlatforms[topTrackedPlatformIndex] == null)
+        if (topTrackedPlatformIndex < 0 || topTrackedPlatformIndex >= activePlatforms.Count || activePlatforms[topTrackedPlatformIndex] == null)
         {
             // 上方追踪平台已不存在，寻找下一个平台
             topTrackedPlatformIndex = -1;
@@ -651,7 +651,7 @@ public class ClimbingGameUI : MonoBehaviour
         }
 
         // 更新下方追踪平台索引
-        if (bottomTrackedPlatformIndex >= activePlatforms.Count || activePlatforms[bottomTrackedPlatformIndex] == null)
+        if (bottomTrackedPlatformIndex < 0 || bottomTrackedPlatformIndex >= activePlatforms.Count || activePlatforms[bottomTrackedPlatformIndex] == null)
         {
             // 下方追踪平台已不存在，寻找上面的平台
             bottomTrackedPlatformIndex = -1;
