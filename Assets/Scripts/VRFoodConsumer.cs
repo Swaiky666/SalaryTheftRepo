@@ -1,51 +1,51 @@
-using System.Collections;
+ï»¿using System.Collections;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.UI;
 
 public class VRFoodConsumer : MonoBehaviour
 {
-    [Header("¼¤¹â¼ì²âÉèÖÃ")]
-    public Transform headTransform; // Í·²¿Transform£¨Í¨³£ÊÇMain Camera£©
-    public float laserLength = 0.5f; // ¼¤¹â³¤¶È
-    public float coneAngle = 30f; // Ô²×¶½Ç¶È£¨¶È£©
-    public LayerMask foodLayerMask = -1; // Ê³Îï²ã¼¶ÕÚÕÖ
+    [Header("æ¿€å…‰æ£€æµ‹è®¾ç½®")]
+    public Transform headTransform; // å¤´éƒ¨Transformï¼ˆé€šå¸¸æ˜¯Main Cameraï¼‰
+    public float laserLength = 0.5f; // æ¿€å…‰é•¿åº¦
+    public float coneAngle = 30f; // åœ†é”¥è§’åº¦ï¼ˆåº¦ï¼‰
+    public LayerMask foodLayerMask = -1; // é£Ÿç‰©å±‚çº§é®ç½©
 
-    [Header("Ïû·ÑÉèÖÃ")]
-    public float consumeDuration = 2f; // ³Ô¶«Î÷µÄ³ÖĞøÊ±¼ä£¨Ãë£©
-    public ParticleSystem eatingEffectPrefab; // ³Ô¶«Î÷Ê±µÄÁ£×ÓÏµÍ³Ô¤ÖÆ¼ş
-    public Transform eatingEffectSpawnPoint; // Á£×ÓÏµÍ³Éú³ÉÎ»ÖÃ£¨ÀıÈç×ì°ÍÎ»ÖÃ£©
+    [Header("æ¶ˆè´¹è®¾ç½®")]
+    public float consumeDuration = 2f; // åƒä¸œè¥¿çš„æŒç»­æ—¶é—´ï¼ˆç§’ï¼‰
+    public ParticleSystem eatingEffectPrefab; // åƒä¸œè¥¿æ—¶çš„ç²’å­ç³»ç»Ÿé¢„åˆ¶ä»¶
+    public Transform eatingEffectSpawnPoint; // ç²’å­ç³»ç»Ÿç”Ÿæˆä½ç½®ï¼ˆä¾‹å¦‚å˜´å·´ä½ç½®ï¼‰
 
-    [Header("UIÉèÖÃ")]
-    public Slider speedBoostSlider; // ¼ÓËÙbuffµ¹¼ÆÊ±»¬¿é£¨ÍÏ×§ÄãµÄSliderµ½ÕâÀï£©
+    [Header("UIè®¾ç½®")]
+    public Slider speedBoostSlider; // åŠ é€Ÿbuffå€’è®¡æ—¶æ»‘å—ï¼ˆæ‹–æ‹½ä½ çš„Slideråˆ°è¿™é‡Œï¼‰
 
-    [Header("µ÷ÊÔÉèÖÃ")]
-    public bool showDebugLaser = true; // ÊÇ·ñÏÔÊ¾¼¤¹âÉäÏß
+    [Header("è°ƒè¯•è®¾ç½®")]
+    public bool showDebugLaser = true; // æ˜¯å¦æ˜¾ç¤ºæ¿€å…‰å°„çº¿
 
-    // Ë½ÓĞ±äÁ¿
+    // ç§æœ‰å˜é‡
     private CharacterController characterController;
     private GameLogicSystem gameLogicSystem;
-    private CharacterStatus characterStatus; // Ìí¼Ó½ÇÉ«×´Ì¬ÒıÓÃ
+    private CharacterStatus characterStatus; // æ·»åŠ è§’è‰²çŠ¶æ€å¼•ç”¨
 
-    // Ïû·Ñ×´Ì¬
-    private bool isEating = false; // ÊÇ·ñÕıÔÚ³Ô¶«Î÷
+    // æ¶ˆè´¹çŠ¶æ€
+    private bool isEating = false; // æ˜¯å¦æ­£åœ¨åƒä¸œè¥¿
     private Coroutine eatingCoroutine;
-    private ParticleSystem currentEatingEffect; // µ±Ç°ÊµÀı»¯µÄÁ£×ÓÏµÍ³
+    private ParticleSystem currentEatingEffect; // å½“å‰å®ä¾‹åŒ–çš„ç²’å­ç³»ç»Ÿ
 
-    // ËÙ¶È¼Ó³ÉÏà¹Ø
+    // é€Ÿåº¦åŠ æˆç›¸å…³
     private bool hasSpeedBoost = false;
-    private float originalMoveSpeed = 2f; // Ô­Ê¼ÒÆ¶¯ËÙ¶È
-    private float boostedMoveSpeed = 2f; // ¼Ó³ÉºóµÄÒÆ¶¯ËÙ¶È
+    private float originalMoveSpeed = 2f; // åŸå§‹ç§»åŠ¨é€Ÿåº¦
+    private float boostedMoveSpeed = 2f; // åŠ æˆåçš„ç§»åŠ¨é€Ÿåº¦
     private Coroutine speedBoostCoroutine;
 
     void Start()
     {
-        // »ñÈ¡×é¼ş
+        // è·å–ç»„ä»¶
         characterController = GetComponent<CharacterController>();
         gameLogicSystem = FindObjectOfType<GameLogicSystem>();
-        characterStatus = GetComponent<CharacterStatus>(); // »ñÈ¡½ÇÉ«×´Ì¬×é¼ş
+        characterStatus = GetComponent<CharacterStatus>(); // è·å–è§’è‰²çŠ¶æ€ç»„ä»¶
 
-        // Èç¹ûÃ»ÓĞÖ¸¶¨Í·²¿Transform£¬³¢ÊÔÕÒµ½Main Camera
+        // å¦‚æœæ²¡æœ‰æŒ‡å®šå¤´éƒ¨Transformï¼Œå°è¯•æ‰¾åˆ°Main Camera
         if (headTransform == null)
         {
             Camera mainCamera = Camera.main;
@@ -55,24 +55,24 @@ public class VRFoodConsumer : MonoBehaviour
             }
         }
 
-        // Èç¹ûÃ»ÓĞÖ¸¶¨Á£×ÓÏµÍ³Éú³Éµã£¬Ê¹ÓÃÍ·²¿Transform
+        // å¦‚æœæ²¡æœ‰æŒ‡å®šç²’å­ç³»ç»Ÿç”Ÿæˆç‚¹ï¼Œä½¿ç”¨å¤´éƒ¨Transform
         if (eatingEffectSpawnPoint == null)
         {
             eatingEffectSpawnPoint = headTransform;
         }
 
-        // ³õÊ¼»¯¼ÓËÙbuff UI×´Ì¬
+        // åˆå§‹åŒ–åŠ é€Ÿbuff UIçŠ¶æ€
         if (speedBoostSlider != null)
         {
             speedBoostSlider.gameObject.SetActive(false);
         }
 
-        // »ñÈ¡Character ControllerµÄÔ­Ê¼ÒÆ¶¯ËÙ¶È
-        // ×¢Òâ£ºCharacter Controller±¾ÉíÃ»ÓĞmoveSpeedÊôĞÔ
-        // Äã¿ÉÄÜĞèÒª¸ù¾İÄãµÄÒÆ¶¯½Å±¾À´µ÷ÕûÕâ²¿·Ö
+        // è·å–Character Controllerçš„åŸå§‹ç§»åŠ¨é€Ÿåº¦
+        // æ³¨æ„ï¼šCharacter Controlleræœ¬èº«æ²¡æœ‰moveSpeedå±æ€§
+        // ä½ å¯èƒ½éœ€è¦æ ¹æ®ä½ çš„ç§»åŠ¨è„šæœ¬æ¥è°ƒæ•´è¿™éƒ¨åˆ†
         if (characterController != null)
         {
-            // ÕâÀï¼ÙÉèÄãÓĞÒ»¸öÒÆ¶¯½Å±¾£¬ÄãĞèÒª¸ù¾İÊµ¼ÊÇé¿öµ÷Õû
+            // è¿™é‡Œå‡è®¾ä½ æœ‰ä¸€ä¸ªç§»åŠ¨è„šæœ¬ï¼Œä½ éœ€è¦æ ¹æ®å®é™…æƒ…å†µè°ƒæ•´
             var moveProvider = GetComponent<ActionBasedContinuousMoveProvider>();
             if (moveProvider != null)
             {
@@ -83,29 +83,29 @@ public class VRFoodConsumer : MonoBehaviour
 
     void Update()
     {
-        // ¼¤¹â¼ì²âÊ³Îï²¢×Ô¶¯Ïû·Ñ
+        // æ¿€å…‰æ£€æµ‹é£Ÿç‰©å¹¶è‡ªåŠ¨æ¶ˆè´¹
         DetectAndConsumeFood();
     }
 
     /// <summary>
-    /// ¼¤¹â¼ì²âÊ³Îï²¢×Ô¶¯Ïû·Ñ£¨Ô²×¶ĞÎ¼ì²â£©
+    /// æ¿€å…‰æ£€æµ‹é£Ÿç‰©å¹¶è‡ªåŠ¨æ¶ˆè´¹ï¼ˆåœ†é”¥å½¢æ£€æµ‹ï¼‰
     /// </summary>
     private void DetectAndConsumeFood()
     {
         if (headTransform == null || isEating) return;
 
-        // µ÷ÊÔÓÃÔ²×¶¼¤¹âÏÔÊ¾
+        // è°ƒè¯•ç”¨åœ†é”¥æ¿€å…‰æ˜¾ç¤º
         if (showDebugLaser)
         {
             DrawDebugCone();
         }
 
-        // Ô²×¶ĞÎ¼ì²â
+        // åœ†é”¥å½¢æ£€æµ‹
         FoodItem closestFood = DetectFoodInCone();
 
         if (closestFood != null)
         {
-            // ¼¤¹âÅöµ½Ê³Îï¾ÍÖ±½Ó¿ªÊ¼³Ô
+            // æ¿€å…‰ç¢°åˆ°é£Ÿç‰©å°±ç›´æ¥å¼€å§‹åƒ
             if (eatingCoroutine != null)
             {
                 StopCoroutine(eatingCoroutine);
@@ -115,15 +115,15 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// ÔÚÔ²×¶·¶Î§ÄÚ¼ì²âÊ³Îï
+    /// åœ¨åœ†é”¥èŒƒå›´å†…æ£€æµ‹é£Ÿç‰©
     /// </summary>
-    /// <returns>×î½üµÄÊ³Îï£¬Èç¹ûÃ»ÓĞÔò·µ»Ønull</returns>
+    /// <returns>æœ€è¿‘çš„é£Ÿç‰©ï¼Œå¦‚æœæ²¡æœ‰åˆ™è¿”å›null</returns>
     private FoodItem DetectFoodInCone()
     {
         Vector3 headPosition = headTransform.position;
         Vector3 headForward = headTransform.forward;
 
-        // Ê¹ÓÃOverlapSphereÕÒµ½·¶Î§ÄÚµÄËùÓĞÅö×²Ìå
+        // ä½¿ç”¨OverlapSphereæ‰¾åˆ°èŒƒå›´å†…çš„æ‰€æœ‰ç¢°æ’ä½“
         Collider[] colliders = Physics.OverlapSphere(headPosition, laserLength, foodLayerMask);
 
         FoodItem closestFood = null;
@@ -131,20 +131,20 @@ public class VRFoodConsumer : MonoBehaviour
 
         foreach (Collider collider in colliders)
         {
-            // ¼ÆËãµ½Ê³ÎïµÄ·½Ïò
+            // è®¡ç®—åˆ°é£Ÿç‰©çš„æ–¹å‘
             Vector3 directionToFood = (collider.transform.position - headPosition).normalized;
 
-            // ¼ÆËã½Ç¶È
+            // è®¡ç®—è§’åº¦
             float angle = Vector3.Angle(headForward, directionToFood);
 
-            // ¼ì²éÊÇ·ñÔÚÔ²×¶½Ç¶ÈÄÚ
+            // æ£€æŸ¥æ˜¯å¦åœ¨åœ†é”¥è§’åº¦å†…
             if (angle <= coneAngle * 0.5f)
             {
-                // ¼ì²éÊÇ·ñÓĞÊ³Îï×é¼ş
+                // æ£€æŸ¥æ˜¯å¦æœ‰é£Ÿç‰©ç»„ä»¶
                 FoodItem foodItem = collider.GetComponent<FoodItem>();
                 if (foodItem != null)
                 {
-                    // ÕÒµ½×î½üµÄÊ³Îï
+                    // æ‰¾åˆ°æœ€è¿‘çš„é£Ÿç‰©
                     float distance = Vector3.Distance(headPosition, collider.transform.position);
                     if (distance < closestDistance)
                     {
@@ -159,7 +159,7 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// »æÖÆµ÷ÊÔÓÃµÄÔ²×¶¼¤¹â
+    /// ç»˜åˆ¶è°ƒè¯•ç”¨çš„åœ†é”¥æ¿€å…‰
     /// </summary>
     private void DrawDebugCone()
     {
@@ -168,16 +168,16 @@ public class VRFoodConsumer : MonoBehaviour
         Vector3 headUp = headTransform.up;
         Vector3 headRight = headTransform.right;
 
-        // ¼ÆËãÔ²×¶Ä©¶ËµÄÔ²ĞÎ°ë¾¶
+        // è®¡ç®—åœ†é”¥æœ«ç«¯çš„åœ†å½¢åŠå¾„
         float coneRadius = laserLength * Mathf.Tan(coneAngle * 0.5f * Mathf.Deg2Rad);
 
-        // Ô²×¶Ä©¶ËÖĞĞÄµã
+        // åœ†é”¥æœ«ç«¯ä¸­å¿ƒç‚¹
         Vector3 coneEndCenter = headPosition + headForward * laserLength;
 
-        // »æÖÆÖĞĞÄÏß
+        // ç»˜åˆ¶ä¸­å¿ƒçº¿
         Debug.DrawRay(headPosition, headForward * laserLength, Color.red);
 
-        // »æÖÆÔ²×¶±ßÔµÏß£¨8ÌõÏßĞÎ³ÉÔ²×¶ÂÖÀª£©
+        // ç»˜åˆ¶åœ†é”¥è¾¹ç¼˜çº¿ï¼ˆ8æ¡çº¿å½¢æˆåœ†é”¥è½®å»“ï¼‰
         int segments = 8;
         for (int i = 0; i < segments; i++)
         {
@@ -185,10 +185,10 @@ public class VRFoodConsumer : MonoBehaviour
             Vector3 direction = headUp * Mathf.Sin(angle) + headRight * Mathf.Cos(angle);
             Vector3 coneEdgePoint = coneEndCenter + direction * coneRadius;
 
-            // ´ÓÍ·²¿µ½Ô²×¶±ßÔµµÄÏß
+            // ä»å¤´éƒ¨åˆ°åœ†é”¥è¾¹ç¼˜çš„çº¿
             Debug.DrawLine(headPosition, coneEdgePoint, Color.yellow);
 
-            // Ô²×¶Ä©¶ËµÄÔ²ĞÎÂÖÀª
+            // åœ†é”¥æœ«ç«¯çš„åœ†å½¢è½®å»“
             if (i < segments - 1)
             {
                 float nextAngle = (360f / segments) * (i + 1) * Mathf.Deg2Rad;
@@ -198,7 +198,7 @@ public class VRFoodConsumer : MonoBehaviour
             }
             else
             {
-                // Á¬½Ó×îºóÒ»ÌõÏßµ½µÚÒ»¸öµã
+                // è¿æ¥æœ€åä¸€æ¡çº¿åˆ°ç¬¬ä¸€ä¸ªç‚¹
                 Vector3 firstDirection = headUp * Mathf.Sin(0) + headRight * Mathf.Cos(0);
                 Vector3 firstConeEdgePoint = coneEndCenter + firstDirection * coneRadius;
                 Debug.DrawLine(coneEdgePoint, firstConeEdgePoint, Color.green);
@@ -207,61 +207,86 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// ÊµÀı»¯³Ô¶«Î÷µÄÁ£×ÓÌØĞ§
+    /// å®ä¾‹åŒ–åƒä¸œè¥¿çš„ç²’å­ç‰¹æ•ˆ
     /// </summary>
     private void StartEatingEffect()
     {
         if (eatingEffectPrefab != null && eatingEffectSpawnPoint != null)
         {
-            // ÔÚÖ¸¶¨Î»ÖÃÊµÀı»¯Á£×ÓÏµÍ³
+            // åœ¨æŒ‡å®šä½ç½®å®ä¾‹åŒ–ç²’å­ç³»ç»Ÿ
             currentEatingEffect = Instantiate(eatingEffectPrefab, eatingEffectSpawnPoint.position, eatingEffectSpawnPoint.rotation);
 
-            // ½«Á£×ÓÏµÍ³ÉèÖÃÎªeatingEffectSpawnPointµÄ×Ó¶ÔÏó£¬ÕâÑù»á¸úËæÒÆ¶¯
+            // å°†ç²’å­ç³»ç»Ÿè®¾ç½®ä¸ºeatingEffectSpawnPointçš„å­å¯¹è±¡ï¼Œè¿™æ ·ä¼šè·Ÿéšç§»åŠ¨
             currentEatingEffect.transform.SetParent(eatingEffectSpawnPoint);
 
-            // ²¥·ÅÁ£×ÓÏµÍ³
+            // æ’­æ”¾ç²’å­ç³»ç»Ÿ
             currentEatingEffect.Play();
 
-            Debug.Log("¿ªÊ¼²¥·Å³Ô¶«Î÷Á£×ÓÌØĞ§");
+            Debug.Log("å¼€å§‹æ’­æ”¾åƒä¸œè¥¿ç²’å­ç‰¹æ•ˆ");
         }
         else
         {
-            Debug.LogWarning("³Ô¶«Î÷Á£×ÓÌØĞ§Ô¤ÖÆ¼ş»òÉú³ÉµãÎ´ÉèÖÃ");
+            Debug.LogWarning("åƒä¸œè¥¿ç²’å­ç‰¹æ•ˆé¢„åˆ¶ä»¶æˆ–ç”Ÿæˆç‚¹æœªè®¾ç½®");
         }
     }
 
     /// <summary>
-    /// Í£Ö¹²¢Ïú»Ù³Ô¶«Î÷µÄÁ£×ÓÌØĞ§
+    /// åº”ç”¨é£Ÿç‰©çš„ç²’å­é¢œè‰²åˆ°å½“å‰çš„åƒä¸œè¥¿ç‰¹æ•ˆ
+    /// </summary>
+    /// <param name="startColor">ç²’å­çš„å¼€å§‹é¢œè‰²</param>
+    /// <param name="endColor">ç²’å­çš„ç»“æŸé¢œè‰²</param>
+    private void ApplyParticleColors(Color startColor, Color endColor)
+    {
+        if (currentEatingEffect != null)
+        {
+            // è·å–ä¸»æ¨¡å—
+            var main = currentEatingEffect.main;
+
+            // æ–¹å¼ä¸€ï¼šä½¿ç”¨åŒè‰² MinMaxGradient (æ¨è)
+            ParticleSystem.MinMaxGradient gradient = new ParticleSystem.MinMaxGradient(startColor, endColor);
+
+            // â­ ä¿®å¤ CS0426 é”™è¯¯ï¼šç›´æ¥ä½¿ç”¨ ParticleSystemGradientMode æšä¸¾å
+            // è¿™æ˜¯ Unity C# è„šæœ¬ä¸­è®¿é—®æ­¤åµŒå¥—æšä¸¾çš„æœ€å¸¸è§å’Œæ­£ç¡®æ–¹å¼ã€‚
+            gradient.mode = ParticleSystemGradientMode.TwoColors;
+
+            main.startColor = gradient;
+
+            Debug.Log($"ç²’å­é¢œè‰²å·²è®¾ç½®ä¸º Start: {startColor}, End: {endColor}");
+        }
+    }
+
+
+    /// <summary>
+    /// åœæ­¢å¹¶é”€æ¯åƒä¸œè¥¿çš„ç²’å­ç‰¹æ•ˆ
     /// </summary>
     private void StopEatingEffect()
     {
         if (currentEatingEffect != null)
         {
-            // Í£Ö¹Á£×ÓÏµÍ³
+            // åœæ­¢ç²’å­ç³»ç»Ÿ
             currentEatingEffect.Stop();
 
-            // µÈ´ıÁ£×ÓÏµÍ³ÍêÈ«Í£Ö¹ºóÏú»Ù£¨¿ÉÑ¡£©
-            // Èç¹ûÄãÏëÁ¢¼´Ïú»Ù£¬Ö±½ÓÊ¹ÓÃ Destroy
+            // ç­‰å¾…ç²’å­ç³»ç»Ÿå®Œå…¨åœæ­¢åé”€æ¯ï¼ˆå¯é€‰ï¼‰
             StartCoroutine(DestroyEffectAfterStop(currentEatingEffect));
 
             currentEatingEffect = null;
 
-            Debug.Log("Í£Ö¹³Ô¶«Î÷Á£×ÓÌØĞ§");
+            Debug.Log("åœæ­¢åƒä¸œè¥¿ç²’å­ç‰¹æ•ˆ");
         }
     }
 
     /// <summary>
-    /// µÈ´ıÁ£×ÓÏµÍ³Í£Ö¹ºóÏú»Ù
+    /// ç­‰å¾…ç²’å­ç³»ç»Ÿåœæ­¢åé”€æ¯
     /// </summary>
     private IEnumerator DestroyEffectAfterStop(ParticleSystem effect)
     {
-        // µÈ´ıÁ£×ÓÏµÍ³²»ÔÙ²¥·Å
+        // ç­‰å¾…ç²’å­ç³»ç»Ÿä¸å†æ’­æ”¾
         while (effect != null && effect.isPlaying)
         {
             yield return null;
         }
 
-        // Ïú»ÙÁ£×ÓÏµÍ³GameObject
+        // é”€æ¯ç²’å­ç³»ç»ŸGameObject
         if (effect != null)
         {
             Destroy(effect.gameObject);
@@ -269,41 +294,46 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// Ïû·ÑÊ³ÎïĞ­³Ì£¨´øÑÓ³Ù£©
+    /// æ¶ˆè´¹é£Ÿç‰©åç¨‹ï¼ˆå¸¦å»¶è¿Ÿï¼‰
     /// </summary>
-    /// <param name="foodItem">ÒªÏû·ÑµÄÊ³Îï</param>
+    /// <param name="foodItem">è¦æ¶ˆè´¹çš„é£Ÿç‰©</param>
     private IEnumerator ConsumeFood(FoodItem foodItem)
     {
         isEating = true;
 
-        // ÉèÖÃÃşÓã×´Ì¬Îªtrue
+        // è®¾ç½®æ‘¸é±¼çŠ¶æ€ä¸ºtrue
         if (characterStatus != null)
         {
             characterStatus.isSlackingAtWork = true;
         }
 
-        // ¿ªÊ¼³Ô¶«Î÷Á£×ÓÌØĞ§
-        StartEatingEffect();
-
-        Debug.Log($"¿ªÊ¼Ê³ÓÃ: {foodItem.foodName}");
-
-        // »ñÈ¡Ê³ÎïĞ§¹û
+        // è·å–é£Ÿç‰©æ•ˆæœ
         FoodEffect effect = foodItem.GetFoodEffect();
 
-        // Èç¹ûÓĞÑ¹Á¦¼õÉÙĞ§¹û£¬ÔÚ³Ô¶«Î÷¹ı³ÌÖĞ½¥½øÊ½¼õÉÙÑ¹Á¦
+        // å¼€å§‹åƒä¸œè¥¿ç²’å­ç‰¹æ•ˆ
+        StartEatingEffect();
+
+        // â˜…â˜…â˜… å…³é”®ä¿®æ”¹ï¼šåº”ç”¨é£Ÿç‰©çš„é¢œè‰²å±æ€§åˆ°ç²’å­ç³»ç»Ÿ â˜…â˜…â˜…
+        ApplyParticleColors(effect.particleStartColor, effect.particleEndColor);
+
+
+        Debug.Log($"å¼€å§‹é£Ÿç”¨: {foodItem.foodName}");
+
+
+        // å¦‚æœæœ‰å‹åŠ›å‡å°‘æ•ˆæœï¼Œåœ¨åƒä¸œè¥¿è¿‡ç¨‹ä¸­æ¸è¿›å¼å‡å°‘å‹åŠ›
         float stressReductionPerSecond = 0f;
         if (effect.hasStressReduction)
         {
             stressReductionPerSecond = effect.stressReduction / consumeDuration;
         }
 
-        // ³Ô¶«Î÷¹ı³Ì
+        // åƒä¸œè¥¿è¿‡ç¨‹
         float elapsedTime = 0f;
         while (elapsedTime < consumeDuration)
         {
             elapsedTime += Time.deltaTime;
 
-            // ½¥½øÊ½¼õÉÙÑ¹Á¦
+            // æ¸è¿›å¼å‡å°‘å‹åŠ›
             if (effect.hasStressReduction && gameLogicSystem != null)
             {
                 float stressToReduce = stressReductionPerSecond * Time.deltaTime;
@@ -313,24 +343,24 @@ public class VRFoodConsumer : MonoBehaviour
             yield return null;
         }
 
-        // ³ÔÍêºóÁ¢¼´Ó¦ÓÃËÙ¶È¼Ó³É
+        // åƒå®Œåç«‹å³åº”ç”¨é€Ÿåº¦åŠ æˆ
         if (effect.hasSpeedBoost)
         {
             ApplySpeedBoost(effect.speedMultiplier, effect.speedBoostDuration);
-            Debug.Log($"»ñµÃËÙ¶È¼Ó³É: {effect.speedMultiplier}x, ³ÖĞø{effect.speedBoostDuration}Ãë");
+            Debug.Log($"è·å¾—é€Ÿåº¦åŠ æˆ: {effect.speedMultiplier}x, æŒç»­{effect.speedBoostDuration}ç§’");
         }
 
-        // Í£Ö¹³Ô¶«Î÷Á£×ÓÌØĞ§
+        // åœæ­¢åƒä¸œè¥¿ç²’å­ç‰¹æ•ˆ
         StopEatingEffect();
 
-        // Ïû·ÑÊ³Îï£¨É¾³ıÎïÌå£©
+        // æ¶ˆè´¹é£Ÿç‰©ï¼ˆåˆ é™¤ç‰©ä½“ï¼‰
         foodItem.OnConsume();
 
-        Debug.Log($"Ê³ÓÃÍê³É: {foodItem.foodName}");
+        Debug.Log($"é£Ÿç”¨å®Œæˆ: {foodItem.foodName}");
 
         isEating = false;
 
-        // ÉèÖÃÃşÓã×´Ì¬Îªfalse
+        // è®¾ç½®æ‘¸é±¼çŠ¶æ€ä¸ºfalse
         if (characterStatus != null)
         {
             characterStatus.isSlackingAtWork = false;
@@ -340,23 +370,23 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// Ó¦ÓÃÊ³ÎïĞ§¹û£¨ÏÖÔÚÖ»´¦ÀíËÙ¶È¼Ó³É£¬Ñ¹Á¦¼õÉÙÔÚĞ­³ÌÖĞ´¦Àí£©
+    /// åº”ç”¨é£Ÿç‰©æ•ˆæœï¼ˆç°åœ¨åªå¤„ç†é€Ÿåº¦åŠ æˆï¼Œå‹åŠ›å‡å°‘åœ¨åç¨‹ä¸­å¤„ç†ï¼‰
     /// </summary>
-    /// <param name="effect">Ê³ÎïĞ§¹û</param>
+    /// <param name="effect">é£Ÿç‰©æ•ˆæœ</param>
     private void ApplyFoodEffect(FoodEffect effect)
     {
-        // ËÙ¶È¼Ó³ÉÏÖÔÚÔÚĞ­³Ì½áÊøÊ±Ó¦ÓÃ
-        // Ñ¹Á¦¼õÉÙÏÖÔÚÔÚĞ­³Ì¹ı³ÌÖĞ½¥½øÊ½´¦Àí
+        // é€Ÿåº¦åŠ æˆç°åœ¨åœ¨åç¨‹ç»“æŸæ—¶åº”ç”¨
+        // å‹åŠ›å‡å°‘ç°åœ¨åœ¨åç¨‹è¿‡ç¨‹ä¸­æ¸è¿›å¼å¤„ç†
     }
 
     /// <summary>
-    /// Ó¦ÓÃËÙ¶È¼Ó³É
+    /// åº”ç”¨é€Ÿåº¦åŠ æˆ
     /// </summary>
-    /// <param name="multiplier">ËÙ¶È±¶Êı</param>
-    /// <param name="duration">³ÖĞøÊ±¼ä</param>
+    /// <param name="multiplier">é€Ÿåº¦å€æ•°</param>
+    /// <param name="duration">æŒç»­æ—¶é—´</param>
     private void ApplySpeedBoost(float multiplier, float duration)
     {
-        // Èç¹ûÒÑ¾­ÓĞËÙ¶È¼Ó³É£¬ÏÈÍ£Ö¹Ö®Ç°µÄ
+        // å¦‚æœå·²ç»æœ‰é€Ÿåº¦åŠ æˆï¼Œå…ˆåœæ­¢ä¹‹å‰çš„
         if (speedBoostCoroutine != null)
         {
             StopCoroutine(speedBoostCoroutine);
@@ -366,14 +396,14 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// ËÙ¶È¼Ó³ÉĞ­³Ì
+    /// é€Ÿåº¦åŠ æˆåç¨‹
     /// </summary>
     private IEnumerator SpeedBoostCoroutine(float multiplier, float duration)
     {
         hasSpeedBoost = true;
         boostedMoveSpeed = originalMoveSpeed * multiplier;
 
-        // ÏÔÊ¾¼ÓËÙbuff UI
+        // æ˜¾ç¤ºåŠ é€Ÿbuff UI
         if (speedBoostSlider != null)
         {
             speedBoostSlider.gameObject.SetActive(true);
@@ -381,22 +411,22 @@ public class VRFoodConsumer : MonoBehaviour
             speedBoostSlider.value = duration;
         }
 
-        // Ó¦ÓÃËÙ¶È¼Ó³Éµ½ÒÆ¶¯×é¼ş
-        // ×¢Òâ£ºÕâÀïĞèÒª¸ù¾İÄãÊµ¼ÊÊ¹ÓÃµÄÒÆ¶¯½Å±¾À´µ÷Õû
+        // åº”ç”¨é€Ÿåº¦åŠ æˆåˆ°ç§»åŠ¨ç»„ä»¶
+        // æ³¨æ„ï¼šè¿™é‡Œéœ€è¦æ ¹æ®ä½ å®é™…ä½¿ç”¨çš„ç§»åŠ¨è„šæœ¬æ¥è°ƒæ•´
         var moveProvider = GetComponent<ActionBasedContinuousMoveProvider>();
         if (moveProvider != null)
         {
             moveProvider.moveSpeed = boostedMoveSpeed;
         }
 
-        // µ¹¼ÆÊ±¸üĞÂslider
+        // å€’è®¡æ—¶æ›´æ–°slider
         float remainingTime = duration;
         while (remainingTime > 0)
         {
             remainingTime -= Time.deltaTime;
             remainingTime = Mathf.Max(0, remainingTime);
 
-            // ¸üĞÂsliderÖµ
+            // æ›´æ–°sliderå€¼
             if (speedBoostSlider != null)
             {
                 speedBoostSlider.value = remainingTime;
@@ -405,32 +435,32 @@ public class VRFoodConsumer : MonoBehaviour
             yield return null;
         }
 
-        // »Ö¸´Ô­Ê¼ËÙ¶È
+        // æ¢å¤åŸå§‹é€Ÿåº¦
         hasSpeedBoost = false;
         if (moveProvider != null)
         {
             moveProvider.moveSpeed = originalMoveSpeed;
         }
 
-        // Òş²Ø¼ÓËÙbuff UI
+        // éšè—åŠ é€Ÿbuff UI
         if (speedBoostSlider != null)
         {
             speedBoostSlider.gameObject.SetActive(false);
         }
 
         speedBoostCoroutine = null;
-        Debug.Log("ËÙ¶È¼Ó³ÉĞ§¹û½áÊø");
+        Debug.Log("é€Ÿåº¦åŠ æˆæ•ˆæœç»“æŸ");
     }
 
     /// <summary>
-    /// ÊÖ¶¯´¥·¢³Ô¶«Î÷£¨Èç¹ûĞèÒªµÄ»°£©
-    /// ÏÖÔÚÖ÷ÒªÊÇ¼¤¹â×Ô¶¯´¥·¢£¬Õâ¸ö·½·¨×÷Îª±¸ÓÃ
+    /// æ‰‹åŠ¨è§¦å‘åƒä¸œè¥¿ï¼ˆå¦‚æœéœ€è¦çš„è¯ï¼‰
+    /// ç°åœ¨ä¸»è¦æ˜¯æ¿€å…‰è‡ªåŠ¨è§¦å‘ï¼Œè¿™ä¸ªæ–¹æ³•ä½œä¸ºå¤‡ç”¨
     /// </summary>
     public void ManualConsumeFood()
     {
         if (headTransform == null || isEating) return;
 
-        // Ê¹ÓÃÔ²×¶ĞÎ¼ì²â
+        // ä½¿ç”¨åœ†é”¥å½¢æ£€æµ‹
         FoodItem closestFood = DetectFoodInCone();
 
         if (closestFood != null)
@@ -444,7 +474,7 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// Í£Ö¹³Ô¶«Î÷£¨Èç¹ûĞèÒªÖĞ¶ÏµÄ»°£©
+    /// åœæ­¢åƒä¸œè¥¿ï¼ˆå¦‚æœéœ€è¦ä¸­æ–­çš„è¯ï¼‰
     /// </summary>
     public void StopEating()
     {
@@ -452,24 +482,24 @@ public class VRFoodConsumer : MonoBehaviour
         {
             StopCoroutine(eatingCoroutine);
 
-            // Í£Ö¹Á£×ÓÌØĞ§
+            // åœæ­¢ç²’å­ç‰¹æ•ˆ
             StopEatingEffect();
 
             isEating = false;
 
-            // ÉèÖÃÃşÓã×´Ì¬Îªfalse
+            // è®¾ç½®æ‘¸é±¼çŠ¶æ€ä¸ºfalse
             if (characterStatus != null)
             {
                 characterStatus.isSlackingAtWork = false;
             }
 
             eatingCoroutine = null;
-            Debug.Log("Í£Ö¹Ê³ÓÃ");
+            Debug.Log("åœæ­¢é£Ÿç”¨");
         }
     }
 
     /// <summary>
-    /// Í£Ö¹ËÙ¶È¼Ó³É£¨Èç¹ûĞèÒªÖĞ¶ÏµÄ»°£©
+    /// åœæ­¢é€Ÿåº¦åŠ æˆï¼ˆå¦‚æœéœ€è¦ä¸­æ–­çš„è¯ï¼‰
     /// </summary>
     public void StopSpeedBoost()
     {
@@ -477,7 +507,7 @@ public class VRFoodConsumer : MonoBehaviour
         {
             StopCoroutine(speedBoostCoroutine);
 
-            // »Ö¸´Ô­Ê¼ËÙ¶È
+            // æ¢å¤åŸå§‹é€Ÿåº¦
             hasSpeedBoost = false;
             var moveProvider = GetComponent<ActionBasedContinuousMoveProvider>();
             if (moveProvider != null)
@@ -485,24 +515,24 @@ public class VRFoodConsumer : MonoBehaviour
                 moveProvider.moveSpeed = originalMoveSpeed;
             }
 
-            // Òş²Ø¼ÓËÙbuff UI
+            // éšè—åŠ é€Ÿbuff UI
             if (speedBoostSlider != null)
             {
                 speedBoostSlider.gameObject.SetActive(false);
             }
 
             speedBoostCoroutine = null;
-            Debug.Log("ËÙ¶È¼Ó³ÉĞ§¹û±»ÖĞ¶Ï");
+            Debug.Log("é€Ÿåº¦åŠ æˆæ•ˆæœè¢«ä¸­æ–­");
         }
     }
 
-    // ÊôĞÔ·ÃÎÊÆ÷
+    // å±æ€§è®¿é—®å™¨
     public bool IsEating => isEating;
     public bool HasSpeedBoost => hasSpeedBoost;
     public float CurrentMoveSpeed => hasSpeedBoost ? boostedMoveSpeed : originalMoveSpeed;
     public float SpeedBoostTimeRemaining => speedBoostSlider != null ? speedBoostSlider.value : 0f;
 
-    // µ÷ÊÔÏÔÊ¾
+    // è°ƒè¯•æ˜¾ç¤º
     void OnDrawGizmosSelected()
     {
         if (headTransform != null)
@@ -512,17 +542,17 @@ public class VRFoodConsumer : MonoBehaviour
             Vector3 headUp = headTransform.up;
             Vector3 headRight = headTransform.right;
 
-            // ¼ÆËãÔ²×¶Ä©¶ËµÄÔ²ĞÎ°ë¾¶
+            // è®¡ç®—åœ†é”¥æœ«ç«¯çš„åœ†å½¢åŠå¾„
             float coneRadius = laserLength * Mathf.Tan(coneAngle * 0.5f * Mathf.Deg2Rad);
             Vector3 coneEndCenter = headPosition + headForward * laserLength;
 
-            // »æÖÆÔ²×¶ÂÖÀª
+            // ç»˜åˆ¶åœ†é”¥è½®å»“
             Gizmos.color = Color.red;
 
-            // ÖĞĞÄÏß
+            // ä¸­å¿ƒçº¿
             Gizmos.DrawRay(headPosition, headForward * laserLength);
 
-            // Ô²×¶±ßÔµÏß
+            // åœ†é”¥è¾¹ç¼˜çº¿
             int segments = 12;
             Vector3[] conePoints = new Vector3[segments];
 
@@ -533,11 +563,11 @@ public class VRFoodConsumer : MonoBehaviour
                 Vector3 coneEdgePoint = coneEndCenter + direction * coneRadius;
                 conePoints[i] = coneEdgePoint;
 
-                // ´ÓÍ·²¿µ½Ô²×¶±ßÔµµÄÏß
+                // ä»å¤´éƒ¨åˆ°åœ†é”¥è¾¹ç¼˜çš„çº¿
                 Gizmos.DrawLine(headPosition, coneEdgePoint);
             }
 
-            // »æÖÆÔ²×¶Ä©¶ËµÄÔ²ĞÎ
+            // ç»˜åˆ¶åœ†é”¥æœ«ç«¯çš„åœ†å½¢
             Gizmos.color = Color.yellow;
             for (int i = 0; i < segments; i++)
             {
@@ -545,7 +575,7 @@ public class VRFoodConsumer : MonoBehaviour
                 Gizmos.DrawLine(conePoints[i], conePoints[nextIndex]);
             }
 
-            // »æÖÆÔ²×¶Ä©¶ËµÄÖĞĞÄµã
+            // ç»˜åˆ¶åœ†é”¥æœ«ç«¯çš„ä¸­å¿ƒç‚¹
             Gizmos.color = Color.green;
             Gizmos.DrawWireSphere(coneEndCenter, 0.05f);
         }
@@ -553,7 +583,7 @@ public class VRFoodConsumer : MonoBehaviour
 
     void OnDestroy()
     {
-        // È·±£Ïú»ÙÊ±ÇåÀíÁ£×ÓÌØĞ§
+        // ç¡®ä¿é”€æ¯æ—¶æ¸…ç†ç²’å­ç‰¹æ•ˆ
         if (currentEatingEffect != null)
         {
             Destroy(currentEatingEffect.gameObject);
