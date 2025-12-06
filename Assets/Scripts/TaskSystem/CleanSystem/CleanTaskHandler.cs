@@ -13,7 +13,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
 
     [Header("任务设置")]
     [SerializeField] private int rubbishToCleanForCompletion = 5; // 完成任务需要清理的垃圾数量
-    [SerializeField] private float workProgressPerRubbish = 2f; // 每清理一个垃圾增加的工作进度
+    [SerializeField] private float workProgressPerRubbish = 2f; // 每清理一个垃圾增加的工作进度（百分比）
 
     [Header("可重复任务设置")]
     [SerializeField] private bool allowContinuousProgress = true; // 允许任务完成后继续获得进度
@@ -28,9 +28,9 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
     // 私有变量
     private TaskManager taskManager; // 任务管理器引用
     private Dictionary<int, TaskData> activeTasksData = new Dictionary<int, TaskData>(); // 活跃任务数据
-    private Dictionary<int, int> taskCleanProgress = new Dictionary<int, int>(); // 每个任务的清理进度
+    private Dictionary<int, int> taskCleanProgress = new Dictionary<int, int>(); // 每个任务的清理进度（已清理数量）
     private Dictionary<int, bool> taskCompletionStatus = new Dictionary<int, bool>(); // 任务完成状态
-    private int totalRubbishCleaned = 0; // 总清理数量（跨任务）
+    private int totalRubbishCleaned = 0; // 总清理数量（跨所有任务）
 
     /// <summary>
     /// 初始化清理任务处理器
@@ -136,7 +136,9 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
 
         // 存储任务数据
         activeTasksData[taskIndex] = taskData;
+        // 注意：任务启动时清理进度归零
         taskCleanProgress[taskIndex] = 0;
+        // 任务初始状态为未完成
         taskCompletionStatus[taskIndex] = false;
 
         if (enableDebugLog)
@@ -203,7 +205,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
         // 增加工作进度
         AddWorkProgress(progressIncrease, taskData.taskName, wasCompleted);
 
-        // 检查任务是否达到完成条件
+        // 检查任务是否达到完成条件（只检查未完成的任务）
         if (!wasCompleted && taskCleanProgress[taskIndex] >= rubbishToCleanForCompletion)
         {
             CompleteTask(taskIndex);
@@ -212,7 +214,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
         if (enableDebugLog)
         {
             string status = wasCompleted ? "（已完成-持续进度）" : "（进行中）";
-            Debug.Log($"[CleanTaskHandler] 任务 {taskData.taskName} {status}: 清理进度 {taskCleanProgress[taskIndex]}/{rubbishToCleanForCompletion}，工作进度 +{progressIncrease}%");
+            Debug.Log($"[CleanTaskHandler] 任务 {taskData.taskName} {status}: 清理进度 {taskCleanProgress[taskIndex]}/{rubbishToCleanForCompletion}，工作进度 +{progressIncrease:F2}%");
         }
     }
 
@@ -248,6 +250,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
     private void AddWorkProgress(float amount, string taskName, bool isContinuous)
     {
         // 获取GameLogicSystem
+        // 注意：此处GameLogicSystem未在提供的代码中定义，假设它存在于场景中。
         GameLogicSystem gameLogicSystem = FindObjectOfType<GameLogicSystem>();
         if (gameLogicSystem != null)
         {
@@ -256,7 +259,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
             if (enableDebugLog)
             {
                 string progressType = isContinuous ? "持续" : "正常";
-                Debug.Log($"[CleanTaskHandler] 📈 {progressType}工作进度增加: +{amount}% (任务: {taskName})");
+                Debug.Log($"[CleanTaskHandler] 📈 {progressType}工作进度增加: +{amount:F2}% (任务: {taskName})");
             }
         }
         else
@@ -296,7 +299,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
     /// 获取任务清理进度
     /// </summary>
     /// <param name="taskIndex">任务索引</param>
-    /// <returns>清理进度</returns>
+    /// <returns>清理进度（已清理数量）</returns>
     public int GetTaskCleanProgress(int taskIndex)
     {
         return taskCleanProgress.ContainsKey(taskIndex) ? taskCleanProgress[taskIndex] : 0;
@@ -311,7 +314,10 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
     {
         if (!taskCleanProgress.ContainsKey(taskIndex)) return 0f;
 
-        return Mathf.Min(100f, (float)taskCleanProgress[taskIndex] / rubbishToCleanForCompletion * 100f);
+        // 进度计算基于当前清理数与所需清理数的比例
+        float progress = (float)taskCleanProgress[taskIndex] / rubbishToCleanForCompletion * 100f;
+        // 进度最高显示100%
+        return Mathf.Min(100f, progress);
     }
 
     /// <summary>

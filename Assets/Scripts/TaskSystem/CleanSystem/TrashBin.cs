@@ -1,70 +1,54 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 
 /// <summary>
-/// À¬»øÍ°×é¼ş - ¼ì²âºÍ´¦ÀíÀ¬»ø
+/// åƒåœ¾æ¡¶ç»„ä»¶ - æ£€æµ‹å’Œå¤„ç†åƒåœ¾ (ä½¿ç”¨ç¢°æ’ä½“è§¦å‘æ£€æµ‹)
 /// </summary>
+[RequireComponent(typeof(Collider))] // ç¡®ä¿æœ‰ç¢°æ’ä½“
 public class TrashBin : MonoBehaviour
 {
-    [Header("¼ì²âÉèÖÃ")]
-    [SerializeField] private float detectionRadius = 0.5f; // ¼ì²â°ë¾¶
-    [SerializeField] private float detectionHeight = 1f; // ¼ì²â¸ß¶È
-    [SerializeField] private int rayCount = 8; // ÉäÏßÊıÁ¿
-    [SerializeField] private float detectionInterval = 0.1f; // ¼ì²â¼ä¸ô£¨Ãë£©
+    [Header("éŸ³æ•ˆè®¾ç½®")]
+    [SerializeField] private AudioSource audioSource; // éŸ³æ•ˆæ’­æ”¾å™¨
+    [SerializeField] private AudioClip cleanSound; // æ¸…ç†éŸ³æ•ˆ
+    [SerializeField, Range(0f, 1f)] private float cleanVolume = 1f; // æ¸…ç†éŸ³æ•ˆéŸ³é‡
 
-    [Header("ÒôĞ§ÉèÖÃ")]
-    [SerializeField] private AudioSource audioSource; // ÒôĞ§²¥·ÅÆ÷
-    [SerializeField] private AudioClip cleanSound; // ÇåÀíÒôĞ§
-    [SerializeField, Range(0f, 1f)] private float cleanVolume = 1f; // ÇåÀíÒôĞ§ÒôÁ¿
+    [Header("ç‰¹æ•ˆè®¾ç½®")]
+    [SerializeField] private ParticleSystem cleanEffect; // æ¸…ç†ç‰¹æ•ˆ
+    [SerializeField] private float effectDuration = 1f; // ç‰¹æ•ˆæŒç»­æ—¶é—´
 
-    [Header("ÌØĞ§ÉèÖÃ")]
-    [SerializeField] private ParticleSystem cleanEffect; // ÇåÀíÌØĞ§
-    [SerializeField] private float effectDuration = 1f; // ÌØĞ§³ÖĞøÊ±¼ä
+    [Header("è°ƒè¯•è®¾ç½®")]
+    [SerializeField] private bool enableDebugLog = true; // å¯ç”¨è°ƒè¯•æ—¥å¿—
 
-    [Header("µ÷ÊÔÉèÖÃ")]
-    [SerializeField] private bool enableDebugLog = true; // ÆôÓÃµ÷ÊÔÈÕÖ¾
-    [SerializeField] private bool showDebugRays = true; // ÏÔÊ¾µ÷ÊÔÉäÏß
-    [SerializeField] private Color debugRayColor = Color.yellow; // µ÷ÊÔÉäÏßÑÕÉ«
+    // ç§æœ‰å˜é‡
+    private SimplifiedCleanSystem cleanSystem; // æ¸…ç†ç³»ç»Ÿå¼•ç”¨
+    private Collider trashBinCollider; // åƒåœ¾æ¡¶ç¢°æ’ä½“
 
-    // Ë½ÓĞ±äÁ¿
-    private SimplifiedCleanSystem cleanSystem; // ÇåÀíÏµÍ³ÒıÓÃ
-    private Coroutine detectionCoroutine; // ¼ì²âĞ­³Ì
-    private HashSet<GameObject> detectedRubbish = new HashSet<GameObject>(); // ÒÑ¼ì²âµ½µÄÀ¬»ø
-    private Collider trashBinCollider; // À¬»øÍ°Åö×²Ìå
-
-    // ¼ì²âÎ»ÖÃ»º´æ
-    private Vector3 basePosition;
-    private Vector3[] rayDirections;
+    // è·Ÿè¸ªæ­£åœ¨å¤„ç†çš„åƒåœ¾ï¼Œé˜²æ­¢é‡å¤è§¦å‘
+    private HashSet<GameObject> beingCleanedRubbish = new HashSet<GameObject>();
 
     /// <summary>
-    /// ³õÊ¼»¯À¬»øÍ°
+    /// åˆå§‹åŒ–åƒåœ¾æ¡¶
     /// </summary>
-    /// <param name="system">ÇåÀíÏµÍ³ÒıÓÃ</param>
+    /// <param name="system">æ¸…ç†ç³»ç»Ÿå¼•ç”¨</param>
     public void Initialize(SimplifiedCleanSystem system)
     {
         cleanSystem = system;
 
-        // ÑéÖ¤×é¼ş
+        // éªŒè¯ç»„ä»¶å¹¶é…ç½®è§¦å‘å™¨
         ValidateComponents();
 
-        // Ô¤¼ÆËãÉäÏß·½Ïò
-        CalculateRayDirections();
-
-        // ¿ªÊ¼¼ì²â
-        StartDetection();
-
         if (enableDebugLog)
-            Debug.Log($"[TrashBin] À¬»øÍ° {name} ÒÑ³õÊ¼»¯");
+            Debug.Log($"[TrashBin] åƒåœ¾æ¡¶ {name} å·²åˆå§‹åŒ– (ç¢°æ’ä½“è§¦å‘æ£€æµ‹)");
     }
 
     /// <summary>
-    /// ÑéÖ¤×é¼şÉèÖÃ
+    /// éªŒè¯ç»„ä»¶è®¾ç½®å¹¶ç¡®ä¿ç¢°æ’ä½“ä¸ºè§¦å‘å™¨
     /// </summary>
     private void ValidateComponents()
     {
-        // »ñÈ¡»òÌí¼ÓAudioSource
+        // 1. è·å–æˆ–æ·»åŠ AudioSource
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
@@ -74,196 +58,116 @@ public class TrashBin : MonoBehaviour
             audioSource.playOnAwake = false;
         }
 
-        // »ñÈ¡Åö×²Ìå
+        // 2. è·å–å¹¶é…ç½®ç¢°æ’ä½“
         trashBinCollider = GetComponent<Collider>();
         if (trashBinCollider == null)
         {
-            Debug.LogWarning($"[TrashBin] {name} Ã»ÓĞÅö×²Ìå×é¼ş");
+            Debug.LogError($"[TrashBin] {name} å¿…é¡»è¦æœ‰ Collider ç»„ä»¶æ‰èƒ½è¿›è¡Œè§¦å‘æ£€æµ‹!");
+        }
+        else
+        {
+            // ç¡®ä¿ç¢°æ’ä½“æ˜¯è§¦å‘å™¨ (Is Trigger)
+            if (!trashBinCollider.isTrigger)
+            {
+                trashBinCollider.isTrigger = true;
+                if (enableDebugLog)
+                    Debug.LogWarning($"[TrashBin] {name} çš„ Collider å·²è®¾ç½®ä¸º isTrigger = true");
+            }
         }
 
-        // ¼ì²éÌØĞ§
+        // 3. æ£€æŸ¥ç‰¹æ•ˆ
         if (cleanEffect == null)
         {
             cleanEffect = GetComponentInChildren<ParticleSystem>();
         }
-
-        // ÑéÖ¤¼ì²â²ÎÊı
-        if (detectionRadius <= 0)
-        {
-            Debug.LogWarning($"[TrashBin] {name} ¼ì²â°ë¾¶Ó¦´óÓÚ0");
-            detectionRadius = 0.5f;
-        }
-
-        if (detectionHeight <= 0)
-        {
-            Debug.LogWarning($"[TrashBin] {name} ¼ì²â¸ß¶ÈÓ¦´óÓÚ0");
-            detectionHeight = 1f;
-        }
-
-        if (rayCount <= 0)
-        {
-            Debug.LogWarning($"[TrashBin] {name} ÉäÏßÊıÁ¿Ó¦´óÓÚ0");
-            rayCount = 8;
-        }
     }
 
     /// <summary>
-    /// Ô¤¼ÆËãÉäÏß·½Ïò£¨Ô²×¶ĞÎ£©
+    /// ç¢°æ’ä½“è¿›å…¥äº‹ä»¶ (æ ¸å¿ƒæ£€æµ‹é€»è¾‘)
     /// </summary>
-    private void CalculateRayDirections()
+    /// <param name="other">è¿›å…¥çš„ç¢°æ’ä½“</param>
+    void OnTriggerEnter(Collider other)
     {
-        rayDirections = new Vector3[rayCount];
-
-        for (int i = 0; i < rayCount; i++)
+        // 1. æ£€æŸ¥è¿›å…¥çš„ç‰©ä½“æ˜¯å¦æ˜¯åƒåœ¾ (é€šè¿‡æ ‡ç­¾)
+        if (other.CompareTag("Rubbish"))
         {
-            float angle = (360f / rayCount) * i;
-            float radians = angle * Mathf.Deg2Rad;
+            GameObject rubbishObject = other.gameObject;
 
-            // ÔÚµ×ÃæÔ²ÖÜÉÏ¼ÆËãµã
-            Vector3 direction = new Vector3(
-                Mathf.Cos(radians) * detectionRadius,
-                detectionHeight, // ÏòÉÏµÄ·½Ïò
-                Mathf.Sin(radians) * detectionRadius
-            ).normalized;
-
-            rayDirections[i] = direction;
-        }
-    }
-
-    /// <summary>
-    /// ¿ªÊ¼¼ì²â
-    /// </summary>
-    private void StartDetection()
-    {
-        if (detectionCoroutine != null)
-            StopCoroutine(detectionCoroutine);
-
-        detectionCoroutine = StartCoroutine(DetectionRoutine());
-    }
-
-    /// <summary>
-    /// Í£Ö¹¼ì²â
-    /// </summary>
-    private void StopDetection()
-    {
-        if (detectionCoroutine != null)
-        {
-            StopCoroutine(detectionCoroutine);
-            detectionCoroutine = null;
-        }
-    }
-
-    /// <summary>
-    /// ¼ì²âĞ­³Ì
-    /// </summary>
-    private IEnumerator DetectionRoutine()
-    {
-        while (true)
-        {
-            PerformRaycastDetection();
-            yield return new WaitForSeconds(detectionInterval);
-        }
-    }
-
-    /// <summary>
-    /// Ö´ĞĞÉäÏß¼ì²â
-    /// </summary>
-    private void PerformRaycastDetection()
-    {
-        basePosition = transform.position;
-
-        for (int i = 0; i < rayDirections.Length; i++)
-        {
-            Vector3 worldDirection = transform.TransformDirection(rayDirections[i]);
-
-            // ·¢ÉäÉäÏß
-            if (Physics.Raycast(basePosition, worldDirection, out RaycastHit hit, detectionHeight))
+            // 2. æ£€æŸ¥æ˜¯å¦å·²ç»åœ¨æ¸…ç†ä¸­ï¼Œé˜²æ­¢é‡å¤è§¦å‘
+            if (rubbishObject != null && !beingCleanedRubbish.Contains(rubbishObject))
             {
-                // ¼ì²é»÷ÖĞµÄÎïÌåÊÇ·ñÊÇÀ¬»ø
-                if (hit.collider.CompareTag("Rubbish"))
-                {
-                    ProcessRubbish(hit.collider.gameObject);
-                }
-            }
-
-            // »æÖÆµ÷ÊÔÉäÏß
-            if (showDebugRays)
-            {
-                Debug.DrawRay(basePosition, worldDirection * detectionHeight, debugRayColor, detectionInterval);
+                ProcessRubbish(rubbishObject);
             }
         }
     }
 
     /// <summary>
-    /// ´¦Àí¼ì²âµ½µÄÀ¬»ø
+    /// å¤„ç†æ£€æµ‹åˆ°çš„åƒåœ¾
     /// </summary>
-    /// <param name="rubbishObject">À¬»ø¶ÔÏó</param>
+    /// <param name="rubbishObject">åƒåœ¾å¯¹è±¡</param>
     private void ProcessRubbish(GameObject rubbishObject)
     {
-        if (rubbishObject == null || detectedRubbish.Contains(rubbishObject))
-            return;
-
-        // Ìí¼Óµ½ÒÑ¼ì²âÁĞ±í£¨·ÀÖ¹ÖØ¸´´¦Àí£©
-        detectedRubbish.Add(rubbishObject);
+        // æ ‡è®°ä¸ºæ­£åœ¨å¤„ç†
+        beingCleanedRubbish.Add(rubbishObject);
 
         if (enableDebugLog)
-            Debug.Log($"[TrashBin] {name} ¼ì²âµ½À¬»ø: {rubbishObject.name}");
+            Debug.Log($"[TrashBin] {name} æ£€æµ‹åˆ°åƒåœ¾: {rubbishObject.name} (é€šè¿‡ç¢°æ’ä½“è§¦å‘)");
 
-        // ¿ªÊ¼ÇåÀíÀ¬»øµÄĞ­³Ì
+        // å¼€å§‹æ¸…ç†åƒåœ¾çš„åç¨‹
         StartCoroutine(CleanRubbishRoutine(rubbishObject));
     }
 
     /// <summary>
-    /// ÇåÀíÀ¬»øĞ­³Ì
+    /// æ¸…ç†åƒåœ¾åç¨‹
     /// </summary>
-    /// <param name="rubbishObject">ÒªÇåÀíµÄÀ¬»ø</param>
+    /// <param name="rubbishObject">è¦æ¸…ç†çš„åƒåœ¾</param>
     private IEnumerator CleanRubbishRoutine(GameObject rubbishObject)
     {
-        // ²¥·ÅÇåÀíÒôĞ§
+        // æ’­æ”¾æ¸…ç†éŸ³æ•ˆ
         PlayCleanSound();
 
-        // ²¥·ÅÇåÀíÌØĞ§
+        // æ’­æ”¾æ¸…ç†ç‰¹æ•ˆ
         PlayCleanEffect();
 
-        // ÒÆ³ıVR½»»¥×é¼ş
+        // ç§»é™¤VRäº¤äº’ç»„ä»¶
         RemoveVRInteractable(rubbishObject);
 
-        // ¸Ä±ä±êÇ©
+        // æ”¹å˜æ ‡ç­¾ï¼Œé˜²æ­¢äºŒæ¬¡è§¦å‘
         rubbishObject.tag = "Untagged";
 
-        // µÈ´ıÌØĞ§²¥·ÅÍê³É
+        // ç­‰å¾…ç‰¹æ•ˆæ’­æ”¾å®Œæˆ
         yield return new WaitForSeconds(effectDuration);
 
-        // Í¨ÖªÇåÀíÏµÍ³
+        // é€šçŸ¥æ¸…ç†ç³»ç»Ÿ
         if (cleanSystem != null)
         {
             cleanSystem.OnRubbishCleanedCallback(rubbishObject);
         }
 
-        // Ïú»ÙÀ¬»ø¶ÔÏó
+        // é”€æ¯åƒåœ¾å¯¹è±¡
         if (rubbishObject != null)
         {
             Destroy(rubbishObject);
         }
 
-        // ´Ó¼ì²âÁĞ±íÖĞÒÆ³ı
-        detectedRubbish.Remove(rubbishObject);
+        // ä»å¤„ç†åˆ—è¡¨ä¸­ç§»é™¤
+        beingCleanedRubbish.Remove(rubbishObject);
 
         if (enableDebugLog)
-            Debug.Log($"[TrashBin] {name} ÒÑÇåÀíÀ¬»ø: {rubbishObject?.name}");
+            Debug.Log($"[TrashBin] {name} å·²æ¸…ç†åƒåœ¾: {rubbishObject?.name}");
     }
 
     /// <summary>
-    /// ÒÆ³ıVR½»»¥×é¼ş
+    /// ç§»é™¤VRäº¤äº’ç»„ä»¶
     /// </summary>
-    /// <param name="rubbishObject">À¬»ø¶ÔÏó</param>
+    /// <param name="rubbishObject">åƒåœ¾å¯¹è±¡</param>
     private void RemoveVRInteractable(GameObject rubbishObject)
     {
-        // ÒÆ³ıXR Grab Interactable×é¼ş
+        // ç§»é™¤XR Grab Interactableç»„ä»¶
         XRGrabInteractable grabInteractable = rubbishObject.GetComponent<XRGrabInteractable>();
         if (grabInteractable != null)
         {
-            // Èç¹ûÕıÔÚ±»×¥È¡£¬ÏÈÊÍ·Å
+            // å¦‚æœæ­£åœ¨è¢«æŠ“å–ï¼Œå…ˆé‡Šæ”¾
             if (grabInteractable.isSelected)
             {
                 grabInteractable.interactionManager.SelectExit(
@@ -275,10 +179,10 @@ public class TrashBin : MonoBehaviour
             Destroy(grabInteractable);
 
             if (enableDebugLog)
-                Debug.Log($"[TrashBin] ÒÑÒÆ³ı {rubbishObject.name} µÄ XRGrabInteractable ×é¼ş");
+                Debug.Log($"[TrashBin] å·²ç§»é™¤ {rubbishObject.name} çš„ XRGrabInteractable ç»„ä»¶");
         }
 
-        // Ò²¿ÉÒÔÒÆ³ıÆäËûÏà¹ØµÄ½»»¥×é¼ş
+        // ä¹Ÿå¯ä»¥ç§»é™¤å…¶ä»–ç›¸å…³çš„äº¤äº’ç»„ä»¶
         XRSimpleInteractable simpleInteractable = rubbishObject.GetComponent<XRSimpleInteractable>();
         if (simpleInteractable != null)
         {
@@ -287,7 +191,7 @@ public class TrashBin : MonoBehaviour
     }
 
     /// <summary>
-    /// ²¥·ÅÇåÀíÒôĞ§
+    /// æ’­æ”¾æ¸…ç†éŸ³æ•ˆ
     /// </summary>
     private void PlayCleanSound()
     {
@@ -300,7 +204,7 @@ public class TrashBin : MonoBehaviour
     }
 
     /// <summary>
-    /// ²¥·ÅÇåÀíÌØĞ§
+    /// æ’­æ”¾æ¸…ç†ç‰¹æ•ˆ
     /// </summary>
     private void PlayCleanEffect()
     {
@@ -311,90 +215,42 @@ public class TrashBin : MonoBehaviour
     }
 
     /// <summary>
-    /// ÊÖ¶¯´¥·¢¼ì²â£¨µ÷ÊÔÓÃ£©
+    /// æ‰‹åŠ¨è§¦å‘æ£€æµ‹ï¼ˆè°ƒè¯•ç”¨ï¼‰
+    /// æ³¨æ„ï¼šç¢°æ’ä½“æ£€æµ‹æ— æ³•æ‰‹åŠ¨è§¦å‘ï¼Œæ­¤æ–¹æ³•ç°åœ¨ä»…ç”¨äºæç¤ºã€‚
     /// </summary>
-    [ContextMenu("ÊÖ¶¯¼ì²â")]
+    [ContextMenu("æ‰‹åŠ¨è§¦å‘ (ä»…æç¤º)")]
     public void ManualDetection()
     {
-        PerformRaycastDetection();
+        Debug.LogWarning("[TrashBin] ç¢°æ’ä½“æ£€æµ‹ä¾èµ–ç‰©ç†ç³»ç»Ÿï¼Œæ— æ³•æ‰‹åŠ¨è§¦å‘ï¼Œè¯·å°†å¸¦æœ‰'Rubbish'æ ‡ç­¾çš„ç‰©ä½“æ”¾å…¥åƒåœ¾æ¡¶ç¢°æ’ä½“ä¸­æµ‹è¯•ã€‚");
     }
 
     /// <summary>
-    /// ¼ì²éÀ¬»øÍ°×´Ì¬£¨µ÷ÊÔÓÃ£©
+    /// æ£€æŸ¥åƒåœ¾æ¡¶çŠ¶æ€ï¼ˆè°ƒè¯•ç”¨ï¼‰
     /// </summary>
-    [ContextMenu("¼ì²é×´Ì¬")]
+    [ContextMenu("æ£€æŸ¥çŠ¶æ€")]
     public void CheckStatus()
     {
-        Debug.Log($"[TrashBin] === À¬»øÍ° {name} ×´Ì¬ ===");
-        Debug.Log($"¼ì²â°ë¾¶: {detectionRadius}");
-        Debug.Log($"¼ì²â¸ß¶È: {detectionHeight}");
-        Debug.Log($"ÉäÏßÊıÁ¿: {rayCount}");
-        Debug.Log($"¼ì²â¼ä¸ô: {detectionInterval}Ãë");
-        Debug.Log($"ÇåÀíÏµÍ³ÒıÓÃ: {(cleanSystem != null ? "ÒÑÉèÖÃ" : "Î´ÉèÖÃ")}");
-        Debug.Log($"¼ì²âĞ­³Ì×´Ì¬: {(detectionCoroutine != null ? "ÔËĞĞÖĞ" : "Î´ÔËĞĞ")}");
-        Debug.Log($"µ±Ç°¼ì²âµ½µÄÀ¬»øÊıÁ¿: {detectedRubbish.Count}");
-        Debug.Log($"ÒôĞ§×é¼ş: {(audioSource != null ? "ÒÑÉèÖÃ" : "Î´ÉèÖÃ")}");
-        Debug.Log($"ÌØĞ§×é¼ş: {(cleanEffect != null ? "ÒÑÉèÖÃ" : "Î´ÉèÖÃ")}");
+        Debug.Log($"[TrashBin] === åƒåœ¾æ¡¶ {name} çŠ¶æ€ ===");
+        Debug.Log($"æ£€æµ‹ç±»å‹: ç¢°æ’ä½“è§¦å‘å™¨ (OnTriggerEnter)");
+        Debug.Log($"ç¢°æ’ä½“ IsTrigger: {(trashBinCollider != null ? trashBinCollider.isTrigger.ToString() : "N/A")}");
+        Debug.Log($"æ¸…ç†ç³»ç»Ÿå¼•ç”¨: {(cleanSystem != null ? "å·²è®¾ç½®" : "æœªè®¾ç½®")}");
+        Debug.Log($"å½“å‰æ­£åœ¨æ¸…ç†çš„åƒåœ¾æ•°é‡: {beingCleanedRubbish.Count}");
+        Debug.Log($"éŸ³æ•ˆç»„ä»¶: {(audioSource != null ? "å·²è®¾ç½®" : "æœªè®¾ç½®")}");
+        Debug.Log($"ç‰¹æ•ˆç»„ä»¶: {(cleanEffect != null ? "å·²è®¾ç½®" : "æœªè®¾ç½®")}");
     }
 
     /// <summary>
-    /// ²âÊÔÇåÀíÌØĞ§£¨µ÷ÊÔÓÃ£©
+    /// æµ‹è¯•æ¸…ç†ç‰¹æ•ˆï¼ˆè°ƒè¯•ç”¨ï¼‰
     /// </summary>
-    [ContextMenu("²âÊÔÌØĞ§")]
+    [ContextMenu("æµ‹è¯•ç‰¹æ•ˆ")]
     public void TestEffect()
     {
         PlayCleanSound();
         PlayCleanEffect();
     }
 
-    /// <summary>
-    /// ÔÚSceneÊÓÍ¼ÖĞÏÔÊ¾¼ì²âÇøÓò
-    /// </summary>
-    void OnDrawGizmosSelected()
-    {
-        if (!showDebugRays) return;
-
-        // ÏÔÊ¾¼ì²â·¶Î§
-        Gizmos.color = Color.cyan;
-        Vector3 basePos = transform.position;
-
-        // »æÖÆ¼ì²âÔ²ÖùÌåµÄÂÖÀª
-        Gizmos.DrawWireSphere(basePos, detectionRadius);
-        Gizmos.DrawWireSphere(basePos + Vector3.up * detectionHeight, detectionRadius);
-
-        // »æÖÆ´¹Ö±Ïß
-        for (int i = 0; i < 8; i++)
-        {
-            float angle = (360f / 8) * i;
-            float radians = angle * Mathf.Deg2Rad;
-            Vector3 point = basePos + new Vector3(
-                Mathf.Cos(radians) * detectionRadius,
-                0,
-                Mathf.Sin(radians) * detectionRadius
-            );
-            Gizmos.DrawLine(point, point + Vector3.up * detectionHeight);
-        }
-
-        // ÏÔÊ¾ÉäÏß·½Ïò
-        if (Application.isPlaying && rayDirections != null)
-        {
-            Gizmos.color = debugRayColor;
-            foreach (var direction in rayDirections)
-            {
-                Vector3 worldDir = transform.TransformDirection(direction);
-                Gizmos.DrawRay(basePos, worldDir * detectionHeight);
-            }
-        }
-    }
-
     void OnDestroy()
     {
-        StopDetection();
+        // ç¢°æ’ä½“æ£€æµ‹æ— éœ€åœæ­¢åç¨‹
     }
-
-    // ÊôĞÔ·ÃÎÊÆ÷
-    public float DetectionRadius => detectionRadius;
-    public float DetectionHeight => detectionHeight;
-    public int RayCount => rayCount;
-    public bool IsDetecting => detectionCoroutine != null;
 }

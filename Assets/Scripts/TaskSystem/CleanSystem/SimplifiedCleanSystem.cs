@@ -1,33 +1,33 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ¼ò»¯°æÇåÀíÏµÍ³ - ¹ÜÀíÀ¬»øÍ°ºÍÀ¬»øÉú³É
+/// ç®€åŒ–ç‰ˆæ¸…ç†ç³»ç»Ÿ - ç®¡ç†åƒåœ¾æ¡¶å’Œåƒåœ¾ç”Ÿæˆ
 /// </summary>
 public class SimplifiedCleanSystem : MonoBehaviour
 {
-    [Header("À¬»øÍ°ÉèÖÃ")]
-    [SerializeField] private List<TrashBin> trashBins = new List<TrashBin>(); // ËùÓĞÀ¬»øÍ°
+    [Header("åƒåœ¾æ¡¶è®¾ç½®")]
+    [SerializeField] private List<TrashBin> trashBins = new List<TrashBin>(); // æ‰€æœ‰åƒåœ¾æ¡¶åˆ—è¡¨
 
-    [Header("À¬»øÉú³ÉÉèÖÃ")]
-    [SerializeField] private List<GameObject> rubbishPrefabs = new List<GameObject>(); // À¬»øÔ¤ÖÆ¼şÁĞ±í
-    [SerializeField] private List<Transform> spawnPoints = new List<Transform>(); // À¬»øÉú³Éµã
-    [SerializeField] private int maxRubbishCount = 10; // ×î´óÀ¬»øÊıÁ¿
-    [SerializeField] private float spawnInterval = 30f; // Éú³É¼ä¸ôÊ±¼ä£¨Ãë£©
-    [SerializeField] private int initialRubbishCount = 5; // ³õÊ¼À¬»øÊıÁ¿
+    [Header("åƒåœ¾ç”Ÿæˆè®¾ç½®")]
+    [SerializeField] private List<GameObject> rubbishPrefabs = new List<GameObject>(); // åƒåœ¾é¢„åˆ¶ä»¶åˆ—è¡¨
+    [SerializeField] private List<Transform> spawnPoints = new List<Transform>(); // åƒåœ¾ç”Ÿæˆç‚¹åˆ—è¡¨
+    [SerializeField] private int maxRubbishCount = 10; // åœºæ™¯ä¸­æœ€å¤§åƒåœ¾æ•°é‡
+    [SerializeField] private float spawnInterval = 30f; // åƒåœ¾ç”Ÿæˆé—´éš”æ—¶é—´ï¼ˆç§’ï¼‰
+    [SerializeField] private int initialRubbishCount = 5; // åˆå§‹ç”Ÿæˆçš„åƒåœ¾æ•°é‡
 
-    [Header("µ÷ÊÔÉèÖÃ")]
-    [SerializeField] private bool enableDebugLog = true; // ÆôÓÃµ÷ÊÔÈÕÖ¾
+    [Header("è°ƒè¯•è®¾ç½®")]
+    [SerializeField] private bool enableDebugLog = true; // å¯ç”¨è°ƒè¯•æ—¥å¿—
 
-    // Ë½ÓĞ±äÁ¿
-    private List<GameObject> activeRubbish = new List<GameObject>(); // µ±Ç°³¡¾°ÖĞµÄÀ¬»ø
-    private HashSet<Transform> occupiedSpawnPoints = new HashSet<Transform>(); // ÒÑÕ¼ÓÃµÄÉú³Éµã
-    private Coroutine spawnCoroutine; // Éú³ÉĞ­³Ì
-    private int totalRubbishCleaned = 0; // ×ÜÇåÀíÀ¬»øÊıÁ¿
+    // ç§æœ‰å˜é‡
+    private List<GameObject> activeRubbish = new List<GameObject>(); // å½“å‰åœºæ™¯ä¸­çš„æ´»è·ƒåƒåœ¾å¯¹è±¡
+    private HashSet<Transform> occupiedSpawnPoints = new HashSet<Transform>(); // å·²å ç”¨çš„ç”Ÿæˆç‚¹
+    private Coroutine spawnCoroutine; // åƒåœ¾ç”Ÿæˆåç¨‹
+    private int totalRubbishCleaned = 0; // è¿„ä»Šä¸ºæ­¢æ€»æ¸…ç†åƒåœ¾æ•°é‡
 
-    // ÊÂ¼ş
-    public System.Action<int> OnRubbishCleaned; // À¬»ø±»ÇåÀíÊÂ¼ş£¨ÇåÀíÊıÁ¿£©
+    // äº‹ä»¶
+    public System.Action<int> OnRubbishCleaned; // åƒåœ¾è¢«æ¸…ç†äº‹ä»¶ï¼ˆå‚æ•°ä¸ºæ¸…ç†çš„æ•°é‡ï¼‰
 
     void Start()
     {
@@ -35,55 +35,55 @@ public class SimplifiedCleanSystem : MonoBehaviour
     }
 
     /// <summary>
-    /// ³õÊ¼»¯ÇåÀíÏµÍ³
+    /// åˆå§‹åŒ–æ¸…ç†ç³»ç»Ÿ
     /// </summary>
     private void InitializeSystem()
     {
-        // ÑéÖ¤×é¼şÉèÖÃ
+        // éªŒè¯ç»„ä»¶è®¾ç½®
         ValidateComponents();
 
-        // ³õÊ¼»¯À¬»øÍ°
+        // åˆå§‹åŒ–åƒåœ¾æ¡¶
         InitializeTrashBins();
 
-        // Éú³É³õÊ¼À¬»ø
+        // ç”Ÿæˆåˆå§‹åƒåœ¾
         SpawnInitialRubbish();
 
-        // ¿ªÊ¼À¬»øÉú³ÉĞ­³Ì
+        // å¼€å§‹åƒåœ¾ç”Ÿæˆåç¨‹
         StartRubbishSpawning();
 
         if (enableDebugLog)
-            Debug.Log("[SimplifiedCleanSystem] ÇåÀíÏµÍ³ÒÑ³õÊ¼»¯");
+            Debug.Log("[SimplifiedCleanSystem] æ¸…ç†ç³»ç»Ÿå·²åˆå§‹åŒ–");
     }
 
     /// <summary>
-    /// ÑéÖ¤×é¼şÉèÖÃ
+    /// éªŒè¯ç»„ä»¶è®¾ç½®
     /// </summary>
     private void ValidateComponents()
     {
         if (trashBins.Count == 0)
-            Debug.LogWarning("[SimplifiedCleanSystem] Î´ÉèÖÃÀ¬»øÍ°ÁĞ±í");
+            Debug.LogWarning("[SimplifiedCleanSystem] æœªè®¾ç½®åƒåœ¾æ¡¶åˆ—è¡¨");
 
         if (rubbishPrefabs.Count == 0)
-            Debug.LogWarning("[SimplifiedCleanSystem] Î´ÉèÖÃÀ¬»øÔ¤ÖÆ¼şÁĞ±í");
+            Debug.LogWarning("[SimplifiedCleanSystem] æœªè®¾ç½®åƒåœ¾é¢„åˆ¶ä»¶åˆ—è¡¨");
 
         if (spawnPoints.Count == 0)
-            Debug.LogWarning("[SimplifiedCleanSystem] Î´ÉèÖÃÀ¬»øÉú³ÉµãÁĞ±í");
+            Debug.LogWarning("[SimplifiedCleanSystem] æœªè®¾ç½®åƒåœ¾ç”Ÿæˆç‚¹åˆ—è¡¨");
 
         if (maxRubbishCount <= 0)
         {
-            Debug.LogWarning("[SimplifiedCleanSystem] ×î´óÀ¬»øÊıÁ¿Ó¦´óÓÚ0");
+            Debug.LogWarning("[SimplifiedCleanSystem] æœ€å¤§åƒåœ¾æ•°é‡åº”å¤§äº0");
             maxRubbishCount = 10;
         }
 
         if (spawnInterval <= 0)
         {
-            Debug.LogWarning("[SimplifiedCleanSystem] Éú³É¼ä¸ôÓ¦´óÓÚ0");
+            Debug.LogWarning("[SimplifiedCleanSystem] ç”Ÿæˆé—´éš”åº”å¤§äº0");
             spawnInterval = 30f;
         }
     }
 
     /// <summary>
-    /// ³õÊ¼»¯À¬»øÍ°
+    /// åˆå§‹åŒ–åƒåœ¾æ¡¶
     /// </summary>
     private void InitializeTrashBins()
     {
@@ -96,11 +96,11 @@ public class SimplifiedCleanSystem : MonoBehaviour
         }
 
         if (enableDebugLog)
-            Debug.Log($"[SimplifiedCleanSystem] ÒÑ³õÊ¼»¯ {trashBins.Count} ¸öÀ¬»øÍ°");
+            Debug.Log($"[SimplifiedCleanSystem] å·²åˆå§‹åŒ– {trashBins.Count} ä¸ªåƒåœ¾æ¡¶");
     }
 
     /// <summary>
-    /// Éú³É³õÊ¼À¬»ø
+    /// ç”Ÿæˆåˆå§‹åƒåœ¾
     /// </summary>
     private void SpawnInitialRubbish()
     {
@@ -112,11 +112,11 @@ public class SimplifiedCleanSystem : MonoBehaviour
         }
 
         if (enableDebugLog)
-            Debug.Log($"[SimplifiedCleanSystem] ÒÑÉú³É {spawnCount} ¸ö³õÊ¼À¬»ø");
+            Debug.Log($"[SimplifiedCleanSystem] å·²ç”Ÿæˆ {spawnCount} ä¸ªåˆå§‹åƒåœ¾");
     }
 
     /// <summary>
-    /// ¿ªÊ¼À¬»øÉú³ÉĞ­³Ì
+    /// å¼€å§‹åƒåœ¾ç”Ÿæˆåç¨‹
     /// </summary>
     private void StartRubbishSpawning()
     {
@@ -126,11 +126,11 @@ public class SimplifiedCleanSystem : MonoBehaviour
         spawnCoroutine = StartCoroutine(RubbishSpawningRoutine());
 
         if (enableDebugLog)
-            Debug.Log("[SimplifiedCleanSystem] À¬»øÉú³ÉĞ­³ÌÒÑÆô¶¯");
+            Debug.Log("[SimplifiedCleanSystem] åƒåœ¾ç”Ÿæˆåç¨‹å·²å¯åŠ¨");
     }
 
     /// <summary>
-    /// Í£Ö¹À¬»øÉú³ÉĞ­³Ì
+    /// åœæ­¢åƒåœ¾ç”Ÿæˆåç¨‹
     /// </summary>
     private void StopRubbishSpawning()
     {
@@ -141,11 +141,11 @@ public class SimplifiedCleanSystem : MonoBehaviour
         }
 
         if (enableDebugLog)
-            Debug.Log("[SimplifiedCleanSystem] À¬»øÉú³ÉĞ­³ÌÒÑÍ£Ö¹");
+            Debug.Log("[SimplifiedCleanSystem] åƒåœ¾ç”Ÿæˆåç¨‹å·²åœæ­¢");
     }
 
     /// <summary>
-    /// À¬»øÉú³ÉĞ­³Ì
+    /// åƒåœ¾ç”Ÿæˆåç¨‹
     /// </summary>
     private IEnumerator RubbishSpawningRoutine()
     {
@@ -153,7 +153,7 @@ public class SimplifiedCleanSystem : MonoBehaviour
         {
             yield return new WaitForSeconds(spawnInterval);
 
-            // ¼ì²éÊÇ·ñĞèÒªÉú³ÉĞÂÀ¬»ø
+            // æ£€æŸ¥æ˜¯å¦éœ€è¦ç”Ÿæˆæ–°åƒåœ¾
             if (activeRubbish.Count < maxRubbishCount && occupiedSpawnPoints.Count < spawnPoints.Count)
             {
                 SpawnRubbishAtRandomPoint();
@@ -162,14 +162,14 @@ public class SimplifiedCleanSystem : MonoBehaviour
     }
 
     /// <summary>
-    /// ÔÚËæ»úÎ»ÖÃÉú³ÉÀ¬»ø
+    /// åœ¨éšæœºä½ç½®ç”Ÿæˆåƒåœ¾
     /// </summary>
     private void SpawnRubbishAtRandomPoint()
     {
         if (rubbishPrefabs.Count == 0 || spawnPoints.Count == 0)
             return;
 
-        // ÕÒµ½¿ÉÓÃµÄÉú³Éµã
+        // æ‰¾åˆ°å¯ç”¨çš„ç”Ÿæˆç‚¹
         List<Transform> availableSpawnPoints = new List<Transform>();
         foreach (var point in spawnPoints)
         {
@@ -182,28 +182,28 @@ public class SimplifiedCleanSystem : MonoBehaviour
         if (availableSpawnPoints.Count == 0)
         {
             if (enableDebugLog)
-                Debug.Log("[SimplifiedCleanSystem] Ã»ÓĞ¿ÉÓÃµÄÉú³Éµã");
+                Debug.Log("[SimplifiedCleanSystem] æ²¡æœ‰å¯ç”¨çš„ç”Ÿæˆç‚¹");
             return;
         }
 
-        // Ëæ»úÑ¡ÔñÉú³ÉµãºÍÀ¬»øÔ¤ÖÆ¼ş
+        // éšæœºé€‰æ‹©ç”Ÿæˆç‚¹å’Œåƒåœ¾é¢„åˆ¶ä»¶
         Transform selectedPoint = availableSpawnPoints[Random.Range(0, availableSpawnPoints.Count)];
         GameObject selectedPrefab = rubbishPrefabs[Random.Range(0, rubbishPrefabs.Count)];
 
-        // Éú³ÉÀ¬»ø
+        // ç”Ÿæˆåƒåœ¾
         GameObject newRubbish = Instantiate(selectedPrefab, selectedPoint.position, selectedPoint.rotation);
 
-        // È·±£À¬»øÓĞÕıÈ·µÄ±êÇ©
+        // ç¡®ä¿åƒåœ¾æœ‰æ­£ç¡®çš„æ ‡ç­¾
         if (!newRubbish.CompareTag("Rubbish"))
         {
             newRubbish.tag = "Rubbish";
         }
 
-        // Ìí¼Óµ½»îÔ¾À¬»øÁĞ±í
+        // æ·»åŠ åˆ°æ´»è·ƒåƒåœ¾åˆ—è¡¨
         activeRubbish.Add(newRubbish);
         occupiedSpawnPoints.Add(selectedPoint);
 
-        // Ìí¼ÓRubbishItem×é¼ş£¨Èç¹ûÃ»ÓĞµÄ»°£©
+        // æ·»åŠ RubbishItemç»„ä»¶ï¼ˆå¦‚æœæ²¡æœ‰çš„è¯ï¼‰
         RubbishItem rubbishItem = newRubbish.GetComponent<RubbishItem>();
         if (rubbishItem == null)
         {
@@ -212,60 +212,60 @@ public class SimplifiedCleanSystem : MonoBehaviour
         rubbishItem.Initialize(selectedPoint, this);
 
         if (enableDebugLog)
-            Debug.Log($"[SimplifiedCleanSystem] ÔÚ {selectedPoint.name} Éú³ÉÀ¬»ø: {newRubbish.name}");
+            Debug.Log($"[SimplifiedCleanSystem] åœ¨ {selectedPoint.name} ç”Ÿæˆåƒåœ¾: {newRubbish.name}");
     }
 
     /// <summary>
-    /// À¬»ø±»ÇåÀí»Øµ÷£¨ÓÉTrashBinµ÷ÓÃ£©
+    /// åƒåœ¾è¢«æ¸…ç†å›è°ƒï¼ˆç”±TrashBinè°ƒç”¨ï¼‰
     /// </summary>
-    /// <param name="rubbishObject">±»ÇåÀíµÄÀ¬»ø¶ÔÏó</param>
+    /// <param name="rubbishObject">è¢«æ¸…ç†çš„åƒåœ¾å¯¹è±¡</param>
     public void OnRubbishCleanedCallback(GameObject rubbishObject)
     {
         if (rubbishObject == null) return;
 
-        // »ñÈ¡À¬»øÎïÆ·×é¼ş
+        // è·å–åƒåœ¾ç‰©å“ç»„ä»¶
         RubbishItem rubbishItem = rubbishObject.GetComponent<RubbishItem>();
         if (rubbishItem != null)
         {
-            // ÊÍ·ÅÉú³Éµã
+            // é‡Šæ”¾ç”Ÿæˆç‚¹
             occupiedSpawnPoints.Remove(rubbishItem.SpawnPoint);
         }
 
-        // ´Ó»îÔ¾À¬»øÁĞ±íÖĞÒÆ³ı
+        // ä»æ´»è·ƒåƒåœ¾åˆ—è¡¨ä¸­ç§»é™¤
         if (activeRubbish.Contains(rubbishObject))
         {
             activeRubbish.Remove(rubbishObject);
         }
 
-        // Ôö¼ÓÇåÀí¼ÆÊı
+        // å¢åŠ æ¸…ç†è®¡æ•°
         totalRubbishCleaned++;
 
-        // ´¥·¢ÇåÀíÊÂ¼ş
+        // è§¦å‘æ¸…ç†äº‹ä»¶
         OnRubbishCleaned?.Invoke(1);
 
         if (enableDebugLog)
-            Debug.Log($"[SimplifiedCleanSystem] À¬»øÒÑÇåÀí: {rubbishObject.name}£¬×ÜÇåÀíÊıÁ¿: {totalRubbishCleaned}");
+            Debug.Log($"[SimplifiedCleanSystem] åƒåœ¾å·²æ¸…ç†: {rubbishObject.name}ï¼Œæ€»æ¸…ç†æ•°é‡: {totalRubbishCleaned}");
     }
 
     /// <summary>
-    /// »ñÈ¡µ±Ç°À¬»øÊıÁ¿
+    /// è·å–å½“å‰åƒåœ¾æ•°é‡
     /// </summary>
     public int GetCurrentRubbishCount()
     {
-        // ÇåÀíÒÑ±»Ïú»ÙµÄÀ¬»øÒıÓÃ
+        // æ¸…ç†å·²è¢«é”€æ¯çš„åƒåœ¾å¼•ç”¨
         activeRubbish.RemoveAll(rubbish => rubbish == null);
         return activeRubbish.Count;
     }
 
     /// <summary>
-    /// »ñÈ¡×ÜÇåÀíÀ¬»øÊıÁ¿
+    /// è·å–æ€»æ¸…ç†åƒåœ¾æ•°é‡
     /// </summary>
     public int GetTotalCleanedCount() => totalRubbishCleaned;
 
     /// <summary>
-    /// ÇåÀíËùÓĞÀ¬»ø£¨µ÷ÊÔÓÃ£©
+    /// æ¸…ç†æ‰€æœ‰åƒåœ¾ï¼ˆè°ƒè¯•ç”¨ï¼‰
     /// </summary>
-    [ContextMenu("ÇåÀíËùÓĞÀ¬»ø")]
+    [ContextMenu("æ¸…ç†æ‰€æœ‰åƒåœ¾")]
     public void CleanAllRubbish()
     {
         List<GameObject> rubbishToClean = new List<GameObject>(activeRubbish);
@@ -279,43 +279,43 @@ public class SimplifiedCleanSystem : MonoBehaviour
         }
 
         if (enableDebugLog)
-            Debug.Log("[SimplifiedCleanSystem] ÒÑÇåÀíËùÓĞÀ¬»ø");
+            Debug.Log("[SimplifiedCleanSystem] å·²æ¸…ç†æ‰€æœ‰åƒåœ¾");
     }
 
     /// <summary>
-    /// Ç¿ÖÆÉú³ÉÀ¬»ø£¨µ÷ÊÔÓÃ£©
+    /// å¼ºåˆ¶ç”Ÿæˆåƒåœ¾ï¼ˆè°ƒè¯•ç”¨ï¼‰
     /// </summary>
-    [ContextMenu("Ç¿ÖÆÉú³ÉÀ¬»ø")]
+    [ContextMenu("å¼ºåˆ¶ç”Ÿæˆåƒåœ¾")]
     public void ForceSpawnRubbish()
     {
         SpawnRubbishAtRandomPoint();
     }
 
     /// <summary>
-    /// ¼ì²éÇåÀíÏµÍ³×´Ì¬£¨µ÷ÊÔÓÃ£©
+    /// æ£€æŸ¥æ¸…ç†ç³»ç»ŸçŠ¶æ€ï¼ˆè°ƒè¯•ç”¨ï¼‰
     /// </summary>
-    [ContextMenu("¼ì²éÏµÍ³×´Ì¬")]
+    [ContextMenu("æ£€æŸ¥ç³»ç»ŸçŠ¶æ€")]
     public void CheckSystemStatus()
     {
-        Debug.Log($"[SimplifiedCleanSystem] === ÇåÀíÏµÍ³×´Ì¬ ===");
-        Debug.Log($"À¬»øÍ°ÊıÁ¿: {trashBins.Count}");
-        Debug.Log($"À¬»øÔ¤ÖÆ¼şÊıÁ¿: {rubbishPrefabs.Count}");
-        Debug.Log($"Éú³ÉµãÊıÁ¿: {spawnPoints.Count}");
-        Debug.Log($"µ±Ç°À¬»øÊıÁ¿: {GetCurrentRubbishCount()}");
-        Debug.Log($"×î´óÀ¬»øÊıÁ¿: {maxRubbishCount}");
-        Debug.Log($"ÒÑÕ¼ÓÃÉú³Éµã: {occupiedSpawnPoints.Count}");
-        Debug.Log($"×ÜÇåÀíÊıÁ¿: {totalRubbishCleaned}");
-        Debug.Log($"Éú³É¼ä¸ô: {spawnInterval}Ãë");
-        Debug.Log($"Éú³ÉĞ­³Ì×´Ì¬: {(spawnCoroutine != null ? "ÔËĞĞÖĞ" : "Î´ÔËĞĞ")}");
+        Debug.Log($"[SimplifiedCleanSystem] === æ¸…ç†ç³»ç»ŸçŠ¶æ€ ===");
+        Debug.Log($"åƒåœ¾æ¡¶æ•°é‡: {trashBins.Count}");
+        Debug.Log($"åƒåœ¾é¢„åˆ¶ä»¶æ•°é‡: {rubbishPrefabs.Count}");
+        Debug.Log($"ç”Ÿæˆç‚¹æ•°é‡: {spawnPoints.Count}");
+        Debug.Log($"å½“å‰åƒåœ¾æ•°é‡: {GetCurrentRubbishCount()}");
+        Debug.Log($"æœ€å¤§åƒåœ¾æ•°é‡: {maxRubbishCount}");
+        Debug.Log($"å·²å ç”¨ç”Ÿæˆç‚¹: {occupiedSpawnPoints.Count}");
+        Debug.Log($"æ€»æ¸…ç†æ•°é‡: {totalRubbishCleaned}");
+        Debug.Log($"ç”Ÿæˆé—´éš”: {spawnInterval}ç§’");
+        Debug.Log($"ç”Ÿæˆåç¨‹çŠ¶æ€: {(spawnCoroutine != null ? "è¿è¡Œä¸­" : "æœªè¿è¡Œ")}");
     }
 
     void OnDestroy()
     {
-        // Í£Ö¹Éú³ÉĞ­³Ì
+        // åœæ­¢ç”Ÿæˆåç¨‹
         StopRubbishSpawning();
     }
 
-    // ÊôĞÔ·ÃÎÊÆ÷
+    // å±æ€§è®¿é—®å™¨
     public int MaxRubbishCount => maxRubbishCount;
     public float SpawnInterval => spawnInterval;
     public int CurrentRubbishCount => GetCurrentRubbishCount();

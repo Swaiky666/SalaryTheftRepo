@@ -1,35 +1,35 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 
 /// <summary>
-/// À¬»øÎïÆ·×é¼ş - ¹ÜÀíÀ¬»ø×´Ì¬ºÍÊôĞÔ
+/// åƒåœ¾ç‰©å“ç»„ä»¶ - ç®¡ç†åƒåœ¾çŠ¶æ€å’Œå±æ€§
 /// </summary>
 public class RubbishItem : MonoBehaviour
 {
-    [Header("À¬»øÊôĞÔ")]
-    [SerializeField] private bool isInteractable = true; // ÊÇ·ñ¿É½»»¥
+    [Header("åƒåœ¾å±æ€§")]
+    [SerializeField] private bool isInteractable = true; // æ˜¯å¦å¯äº¤äº’
 
-    [Header("Éú³ÉĞÅÏ¢")]
-    [SerializeField] private Transform spawnPoint; // Éú³Éµã
-    [SerializeField] private float spawnTime; // Éú³ÉÊ±¼ä
+    [Header("ç”Ÿæˆä¿¡æ¯")]
+    [SerializeField] private Transform spawnPoint; // ç”Ÿæˆç‚¹
+    [SerializeField] private float spawnTime; // ç”Ÿæˆæ—¶é—´
 
-    [Header("×´Ì¬ĞÅÏ¢")]
-    [SerializeField] private bool isCleaned = false; // ÊÇ·ñÒÑ±»ÇåÀí
-    [SerializeField] private bool isBeingCleaned = false; // ÊÇ·ñÕıÔÚ±»ÇåÀí
+    [Header("çŠ¶æ€ä¿¡æ¯")]
+    [SerializeField] private bool isCleaned = false; // æ˜¯å¦å·²è¢«æ¸…ç†
+    [SerializeField] private bool isBeingCleaned = false; // æ˜¯å¦æ­£åœ¨è¢«æ¸…ç†
 
-    [Header("µ÷ÊÔÉèÖÃ")]
-    [SerializeField] private bool enableDebugLog = true; // ÆôÓÃµ÷ÊÔÈÕÖ¾
+    [Header("è°ƒè¯•è®¾ç½®")]
+    [SerializeField] private bool enableDebugLog = true; // å¯ç”¨è°ƒè¯•æ—¥å¿—
 
-    // Ë½ÓĞ±äÁ¿
-    private SimplifiedCleanSystem cleanSystem; // ÇåÀíÏµÍ³ÒıÓÃ
-    private XRGrabInteractable grabInteractable; // VR×¥È¡×é¼ş
-    private Rigidbody rubbishRigidbody; // ¸ÕÌå×é¼ş
-    private Collider rubbishCollider; // Åö×²Ìå×é¼ş
+    // ç§æœ‰å˜é‡
+    private SimplifiedCleanSystem cleanSystem; // æ¸…ç†ç³»ç»Ÿå¼•ç”¨
+    private XRGrabInteractable grabInteractable; // VRæŠ“å–ç»„ä»¶
+    private Rigidbody rubbishRigidbody; // åˆšä½“ç»„ä»¶
+    private Collider rubbishCollider; // ç¢°æ’ä½“ç»„ä»¶
 
-    // ÊÂ¼ş
-    public System.Action<RubbishItem> OnRubbishCleaned; // À¬»ø±»ÇåÀíÊÂ¼ş
-    public System.Action<RubbishItem> OnRubbishPickedUp; // À¬»ø±»Ê°ÆğÊÂ¼ş
-    public System.Action<RubbishItem> OnRubbishDropped; // À¬»ø±»·ÅÏÂÊÂ¼ş
+    // äº‹ä»¶
+    public System.Action<RubbishItem> OnRubbishCleaned; // åƒåœ¾è¢«æ¸…ç†äº‹ä»¶
+    public System.Action<RubbishItem> OnRubbishPickedUp; // åƒåœ¾è¢«æ‹¾èµ·äº‹ä»¶
+    public System.Action<RubbishItem> OnRubbishDropped; // åƒåœ¾è¢«æ”¾ä¸‹äº‹ä»¶
 
     void Awake()
     {
@@ -42,35 +42,35 @@ public class RubbishItem : MonoBehaviour
     }
 
     /// <summary>
-    /// ³õÊ¼»¯À¬»øÎïÆ·×é¼ş
+    /// åˆå§‹åŒ–åƒåœ¾ç‰©å“ç»„ä»¶
     /// </summary>
-    /// <param name="point">Éú³Éµã</param>
-    /// <param name="system">ÇåÀíÏµÍ³ÒıÓÃ</param>
+    /// <param name="point">ç”Ÿæˆç‚¹</param>
+    /// <param name="system">æ¸…ç†ç³»ç»Ÿå¼•ç”¨</param>
     public void Initialize(Transform point, SimplifiedCleanSystem system)
     {
         spawnPoint = point;
         cleanSystem = system;
         spawnTime = Time.time;
 
-        // È·±£±êÇ©ÕıÈ·
+        // ç¡®ä¿æ ‡ç­¾æ­£ç¡®
         if (!gameObject.CompareTag("Rubbish"))
         {
             gameObject.tag = "Rubbish";
         }
 
-        // ÉèÖÃÎª¿É½»»¥
+        // è®¾ç½®ä¸ºå¯äº¤äº’
         SetInteractable(true);
 
         if (enableDebugLog)
-            Debug.Log($"[RubbishItem] À¬»ø {name} ÒÑ³õÊ¼»¯£¬Éú³Éµã: {point?.name}");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} å·²åˆå§‹åŒ–ï¼Œç”Ÿæˆç‚¹: {point?.name}");
     }
 
     /// <summary>
-    /// ³õÊ¼»¯×é¼ş
+    /// åˆå§‹åŒ–ç»„ä»¶
     /// </summary>
     private void InitializeComponents()
     {
-        // »ñÈ¡»òÌí¼Ó±ØÒª×é¼ş
+        // è·å–æˆ–æ·»åŠ å¿…è¦ç»„ä»¶
         rubbishRigidbody = GetComponent<Rigidbody>();
         if (rubbishRigidbody == null)
         {
@@ -80,23 +80,23 @@ public class RubbishItem : MonoBehaviour
         rubbishCollider = GetComponent<Collider>();
         if (rubbishCollider == null)
         {
-            // Èç¹ûÃ»ÓĞÅö×²Ìå£¬Ìí¼ÓÒ»¸öBox Collider
+            // å¦‚æœæ²¡æœ‰ç¢°æ’ä½“ï¼Œæ·»åŠ ä¸€ä¸ªBox Collider
             rubbishCollider = gameObject.AddComponent<BoxCollider>();
         }
 
-        // »ñÈ¡VR½»»¥×é¼ş
+        // è·å–VRäº¤äº’ç»„ä»¶
         grabInteractable = GetComponent<XRGrabInteractable>();
         if (grabInteractable == null)
         {
             grabInteractable = gameObject.AddComponent<XRGrabInteractable>();
         }
 
-        // °ó¶¨VR½»»¥ÊÂ¼ş
+        // ç»‘å®šVRäº¤äº’äº‹ä»¶
         BindVRInteractionEvents();
     }
 
     /// <summary>
-    /// °ó¶¨VR½»»¥ÊÂ¼ş
+    /// ç»‘å®šVRäº¤äº’äº‹ä»¶
     /// </summary>
     private void BindVRInteractionEvents()
     {
@@ -108,7 +108,7 @@ public class RubbishItem : MonoBehaviour
     }
 
     /// <summary>
-    /// ½â°óVR½»»¥ÊÂ¼ş
+    /// è§£ç»‘VRäº¤äº’äº‹ä»¶
     /// </summary>
     private void UnbindVRInteractionEvents()
     {
@@ -120,33 +120,33 @@ public class RubbishItem : MonoBehaviour
     }
 
     /// <summary>
-    /// À¬»ø±»Ê°ÆğÊ±µ÷ÓÃ
+    /// åƒåœ¾è¢«æ‹¾èµ·æ—¶è°ƒç”¨
     /// </summary>
-    /// <param name="args">Ñ¡ÔñÊÂ¼ş²ÎÊı</param>
+    /// <param name="args">é€‰æ‹©äº‹ä»¶å‚æ•°</param>
     private void OnPickedUp(SelectEnterEventArgs args)
     {
         if (enableDebugLog)
-            Debug.Log($"[RubbishItem] À¬»ø {name} ±»Ê°Æğ");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} è¢«æ‹¾èµ·");
 
         OnRubbishPickedUp?.Invoke(this);
     }
 
     /// <summary>
-    /// À¬»ø±»·ÅÏÂÊ±µ÷ÓÃ
+    /// åƒåœ¾è¢«æ”¾ä¸‹æ—¶è°ƒç”¨
     /// </summary>
-    /// <param name="args">Ñ¡ÔñÍË³öÊÂ¼ş²ÎÊı</param>
+    /// <param name="args">é€‰æ‹©é€€å‡ºäº‹ä»¶å‚æ•°</param>
     private void OnDropped(SelectExitEventArgs args)
     {
         if (enableDebugLog)
-            Debug.Log($"[RubbishItem] À¬»ø {name} ±»·ÅÏÂ");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} è¢«æ”¾ä¸‹");
 
         OnRubbishDropped?.Invoke(this);
     }
 
     /// <summary>
-    /// ÉèÖÃ¿É½»»¥×´Ì¬
+    /// è®¾ç½®å¯äº¤äº’çŠ¶æ€
     /// </summary>
-    /// <param name="interactable">ÊÇ·ñ¿É½»»¥</param>
+    /// <param name="interactable">æ˜¯å¦å¯äº¤äº’</param>
     public void SetInteractable(bool interactable)
     {
         isInteractable = interactable;
@@ -157,11 +157,11 @@ public class RubbishItem : MonoBehaviour
         }
 
         if (enableDebugLog)
-            Debug.Log($"[RubbishItem] À¬»ø {name} ½»»¥×´Ì¬ÉèÖÃÎª: {interactable}");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} äº¤äº’çŠ¶æ€è®¾ç½®ä¸º: {interactable}");
     }
 
     /// <summary>
-    /// ±ê¼ÇÎªÕıÔÚÇåÀí
+    /// æ ‡è®°ä¸ºæ­£åœ¨æ¸…ç†
     /// </summary>
     public void MarkAsBeingCleaned()
     {
@@ -169,10 +169,10 @@ public class RubbishItem : MonoBehaviour
 
         isBeingCleaned = true;
 
-        // ½ûÓÃ½»»¥
+        // ç¦ç”¨äº¤äº’
         SetInteractable(false);
 
-        // Èç¹ûÕıÔÚ±»×¥È¡£¬Ç¿ÖÆÊÍ·Å
+        // å¦‚æœæ­£åœ¨è¢«æŠ“å–ï¼Œå¼ºåˆ¶é‡Šæ”¾
         if (grabInteractable != null && grabInteractable.isSelected)
         {
             grabInteractable.interactionManager.SelectExit(
@@ -182,11 +182,11 @@ public class RubbishItem : MonoBehaviour
         }
 
         if (enableDebugLog)
-            Debug.Log($"[RubbishItem] À¬»ø {name} ±ê¼ÇÎªÕıÔÚÇåÀí");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} æ ‡è®°ä¸ºæ­£åœ¨æ¸…ç†");
     }
 
     /// <summary>
-    /// ±ê¼ÇÎªÒÑÇåÀí
+    /// æ ‡è®°ä¸ºå·²æ¸…ç†
     /// </summary>
     public void MarkAsCleaned()
     {
@@ -195,44 +195,44 @@ public class RubbishItem : MonoBehaviour
         isCleaned = true;
         isBeingCleaned = false;
 
-        // ¸Ä±ä±êÇ©
+        // æ”¹å˜æ ‡ç­¾
         gameObject.tag = "Untagged";
 
-        // ³¹µ×½ûÓÃ½»»¥
+        // å½»åº•ç¦ç”¨äº¤äº’
         SetInteractable(false);
 
-        // ½â°óÊÂ¼ş
+        // è§£ç»‘äº‹ä»¶
         UnbindVRInteractionEvents();
 
-        // ´¥·¢ÇåÀíÊÂ¼ş
+        // è§¦å‘æ¸…ç†äº‹ä»¶
         OnRubbishCleaned?.Invoke(this);
 
         if (enableDebugLog)
-            Debug.Log($"[RubbishItem] À¬»ø {name} ÒÑ±ê¼ÇÎªÇåÀíÍê³É");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} å·²æ ‡è®°ä¸ºæ¸…ç†å®Œæˆ");
     }
 
     /// <summary>
-    /// »ñÈ¡À¬»ø´æÔÚÊ±¼ä
+    /// è·å–åƒåœ¾å­˜åœ¨æ—¶é—´
     /// </summary>
-    /// <returns>´æÔÚÊ±¼ä£¨Ãë£©</returns>
+    /// <returns>å­˜åœ¨æ—¶é—´ï¼ˆç§’ï¼‰</returns>
     public float GetExistenceTime()
     {
         return Time.time - spawnTime;
     }
 
     /// <summary>
-    /// ¼ì²éÊÇ·ñ¿ÉÒÔ±»ÇåÀí
+    /// æ£€æŸ¥æ˜¯å¦å¯ä»¥è¢«æ¸…ç†
     /// </summary>
-    /// <returns>ÊÇ·ñ¿ÉÒÔÇåÀí</returns>
+    /// <returns>æ˜¯å¦å¯ä»¥æ¸…ç†</returns>
     public bool CanBeCleaned()
     {
         return !isCleaned && !isBeingCleaned && gameObject.CompareTag("Rubbish");
     }
 
     /// <summary>
-    /// ÊÖ¶¯ÇåÀíÀ¬»ø£¨µ÷ÊÔÓÃ£©
+    /// æ‰‹åŠ¨æ¸…ç†åƒåœ¾ï¼ˆè°ƒè¯•ç”¨ï¼‰
     /// </summary>
-    [ContextMenu("ÊÖ¶¯ÇåÀí")]
+    [ContextMenu("æ‰‹åŠ¨æ¸…ç†")]
     public void ManualClean()
     {
         if (CanBeCleaned())
@@ -240,49 +240,49 @@ public class RubbishItem : MonoBehaviour
             MarkAsBeingCleaned();
             MarkAsCleaned();
 
-            // Í¨ÖªÇåÀíÏµÍ³
+            // é€šçŸ¥æ¸…ç†ç³»ç»Ÿ
             if (cleanSystem != null)
             {
                 cleanSystem.OnRubbishCleanedCallback(gameObject);
             }
 
-            // Ïú»Ù¶ÔÏó
+            // é”€æ¯å¯¹è±¡
             Destroy(gameObject, 0.5f);
         }
         else
         {
-            Debug.Log($"[RubbishItem] À¬»ø {name} ÎŞ·¨±»ÇåÀí");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} æ— æ³•è¢«æ¸…ç†");
         }
     }
 
     /// <summary>
-    /// ¼ì²éÀ¬»ø×´Ì¬£¨µ÷ÊÔÓÃ£©
+    /// æ£€æŸ¥åƒåœ¾çŠ¶æ€ï¼ˆè°ƒè¯•ç”¨ï¼‰
     /// </summary>
-    [ContextMenu("¼ì²é×´Ì¬")]
+    [ContextMenu("æ£€æŸ¥çŠ¶æ€")]
     public void CheckStatus()
     {
-        Debug.Log($"[RubbishItem] === À¬»ø {name} ×´Ì¬ ===");
-        Debug.Log($"ÊÇ·ñ¿É½»»¥: {isInteractable}");
-        Debug.Log($"ÊÇ·ñÒÑÇåÀí: {isCleaned}");
-        Debug.Log($"ÊÇ·ñÕıÔÚÇåÀí: {isBeingCleaned}");
-        Debug.Log($"Éú³Éµã: {(spawnPoint != null ? spawnPoint.name : "Î´ÉèÖÃ")}");
-        Debug.Log($"´æÔÚÊ±¼ä: {GetExistenceTime():F1}Ãë");
-        Debug.Log($"µ±Ç°±êÇ©: {tag}");
-        Debug.Log($"ÊÇ·ñ¿É±»ÇåÀí: {CanBeCleaned()}");
-        Debug.Log($"VR½»»¥×é¼ş: {(grabInteractable != null ? "ÒÑÉèÖÃ" : "Î´ÉèÖÃ")}");
-        Debug.Log($"ÊÇ·ñ±»×¥È¡: {(grabInteractable != null ? grabInteractable.isSelected : false)}");
+        Debug.Log($"[RubbishItem] === åƒåœ¾ {name} çŠ¶æ€ ===");
+        Debug.Log($"æ˜¯å¦å¯äº¤äº’: {isInteractable}");
+        Debug.Log($"æ˜¯å¦å·²æ¸…ç†: {isCleaned}");
+        Debug.Log($"æ˜¯å¦æ­£åœ¨æ¸…ç†: {isBeingCleaned}");
+        Debug.Log($"ç”Ÿæˆç‚¹: {(spawnPoint != null ? spawnPoint.name : "æœªè®¾ç½®")}");
+        Debug.Log($"å­˜åœ¨æ—¶é—´: {GetExistenceTime():F1}ç§’");
+        Debug.Log($"å½“å‰æ ‡ç­¾: {tag}");
+        Debug.Log($"æ˜¯å¦å¯è¢«æ¸…ç†: {CanBeCleaned()}");
+        Debug.Log($"VRäº¤äº’ç»„ä»¶: {(grabInteractable != null ? "å·²è®¾ç½®" : "æœªè®¾ç½®")}");
+        Debug.Log($"æ˜¯å¦è¢«æŠ“å–: {(grabInteractable != null ? grabInteractable.isSelected : false)}");
     }
 
     void OnDestroy()
     {
-        // ½â°óÊÂ¼ş
+        // è§£ç»‘äº‹ä»¶
         UnbindVRInteractionEvents();
 
         if (enableDebugLog)
-            Debug.Log($"[RubbishItem] À¬»ø {name} ÒÑÏú»Ù£¬´æÔÚÊ±¼ä: {GetExistenceTime():F1}Ãë");
+            Debug.Log($"[RubbishItem] åƒåœ¾ {name} å·²é”€æ¯ï¼Œå­˜åœ¨æ—¶é—´: {GetExistenceTime():F1}ç§’");
     }
 
-    // ÊôĞÔ·ÃÎÊÆ÷
+    // å±æ€§è®¿é—®å™¨
     public bool IsInteractable => isInteractable;
     public bool IsCleaned => isCleaned;
     public bool IsBeingCleaned => isBeingCleaned;
