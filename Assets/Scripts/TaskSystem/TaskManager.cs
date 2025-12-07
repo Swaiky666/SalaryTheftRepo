@@ -103,6 +103,10 @@ public class TaskManager : MonoBehaviour
     private const string NO_TASK_TEXT = "No Task";
     private const string TASK_COMPLETED_TEXT = "Task Completed";
     private const string REPEATABLE_COMPLETED_TEXT = "已完成（可重复完成）";
+    private static readonly Color DEFAULT_COLOR = Color.white; // 默认颜色设置为白色
+    private static readonly Color COMPLETED_COLOR = Color.green;
+    private static readonly Color REPEATABLE_COLOR = Color.cyan;
+    private static readonly Color NO_TASK_COLOR = Color.gray;
 
     void Start()
     {
@@ -301,7 +305,7 @@ public class TaskManager : MonoBehaviour
                 }
             }
         }
-        UpdateTaskUI();
+        // 不需要在这里调用 UpdateTaskUI，因为它会在每次完成任务后调用
     }
 
     public void UpdateTaskUI()
@@ -319,22 +323,21 @@ public class TaskManager : MonoBehaviour
                 if (task.isCompleted)
                 {
                     taskTexts[i].text = task.isRepeatable ? REPEATABLE_COMPLETED_TEXT : TASK_COMPLETED_TEXT;
-                    taskTexts[i].color = task.isRepeatable ? Color.cyan : Color.green;
+                    taskTexts[i].color = task.isRepeatable ? REPEATABLE_COLOR : COMPLETED_COLOR;
                 }
                 else
                 {
                     taskTexts[i].text = GetTaskDisplayName(task);
-
-                    float dynamicPriority = task.CalculateDynamicPriority(Time.time - gameStartTime);
-                    if (dynamicPriority < -1f) taskTexts[i].color = Color.red;
-                    else if (dynamicPriority < 2f) taskTexts[i].color = Color.yellow;
-                    else taskTexts[i].color = Color.white;
+                    // **********************************************
+                    // * 移除根据优先级改变颜色的逻辑，只使用默认颜色 *
+                    // **********************************************
+                    taskTexts[i].color = DEFAULT_COLOR;
                 }
             }
             else
             {
                 taskTexts[i].text = NO_TASK_TEXT;
-                taskTexts[i].color = Color.gray;
+                taskTexts[i].color = NO_TASK_COLOR;
             }
         }
     }
@@ -489,7 +492,7 @@ public class TaskManager : MonoBehaviour
                 if (taskTexts[i] != null)
                 {
                     taskTexts[i].text = NO_TASK_TEXT;
-                    taskTexts[i].color = Color.gray;
+                    taskTexts[i].color = NO_TASK_COLOR;
                 }
             }
         }
