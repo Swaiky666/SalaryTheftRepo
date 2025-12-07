@@ -1,26 +1,33 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 /// <summary>
-/// ÈÎÎñ´¦ÀíÆ÷½Ó¿Ú
-/// ËùÓĞÈÎÎñ´¦ÀíÆ÷¶¼ĞèÒªÊµÏÖ´Ë½Ó¿Ú
+/// ä»»åŠ¡å¤„ç†å™¨æ¥å£
+/// æ‰€æœ‰ä»»åŠ¡å¤„ç†å™¨éƒ½éœ€è¦å®ç°æ­¤æ¥å£
 /// </summary>
 public interface ITaskHandler
 {
     /// <summary>
-    /// ³õÊ¼»¯ÈÎÎñ´¦ÀíÆ÷
+    /// åˆå§‹åŒ–ä»»åŠ¡å¤„ç†å™¨
     /// </summary>
-    /// <param name="taskManager">ÈÎÎñ¹ÜÀíÆ÷ÒıÓÃ</param>
+    /// <param name="taskManager">ä»»åŠ¡ç®¡ç†å™¨å¼•ç”¨</param>
     void Initialize(TaskManager taskManager);
 
     /// <summary>
-    /// ¿ªÊ¼Ö´ĞĞÈÎÎñ
+    /// æ£€æŸ¥æ˜¯å¦å¯ä»¥å¤„ç†æŒ‡å®šç±»å‹çš„ä»»åŠ¡
     /// </summary>
-    /// <param name="taskData">ÈÎÎñÊı¾İ</param>
-    /// <param name="taskIndex">ÈÎÎñË÷Òı</param>
+    /// <param name="taskType">ä»»åŠ¡ç±»å‹</param>
+    /// <returns>æ˜¯å¦å¯ä»¥å¤„ç†</returns>
+    bool CanHandleTask(TaskType taskType);
+
+    /// <summary>
+    /// å¼€å§‹æ‰§è¡Œä»»åŠ¡
+    /// </summary>
+    /// <param name="taskData">ä»»åŠ¡æ•°æ®</param>
+    /// <param name="taskIndex">ä»»åŠ¡åœ¨æ´»è·ƒåˆ—è¡¨ä¸­çš„ç´¢å¼•</param>
     void StartTask(TaskData taskData, int taskIndex);
 
     /// <summary>
-    /// ÇåÀíÈÎÎñÏà¹Ø¶ÔÏó
+    /// æ¸…ç†ä»»åŠ¡ç›¸å…³å¯¹è±¡
     /// </summary>
     void CleanupTasks();
 }

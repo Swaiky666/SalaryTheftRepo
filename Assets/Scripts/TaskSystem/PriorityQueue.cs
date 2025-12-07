@@ -1,254 +1,216 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
+/// 优先级队列节点
+/// </summary>
+public struct PriorityQueueNode<T>
+{
+    public T Item { get; }
+    public float Priority { get; set; }
+
+    public PriorityQueueNode(T item, float priority)
+    {
+        Item = item;
+        Priority = priority;
+    }
+}
+
+/// <summary>
 /// CS400 Application: Min-Heap based Priority Queue
-/// Time Complexity:
-/// - Enqueue: O(log n) - heapify up
-/// - Dequeue: O(log n) - heapify down
-/// - Peek: O(1) - top element access
-/// Space Complexity: O(n) - array storage
-/// 
-/// This implementation demonstrates understanding of heap data structures
-/// from CS400 Binary Search Trees unit (Week 1-2)
 /// </summary>
 public class PriorityQueue<T>
 {
     private List<PriorityQueueNode<T>> heap;
-    private Dictionary<T, int> itemToIndexMap; // O(1) lookup for contains/update operations
-    
+    private Dictionary<T, int> itemToIndexMap;
+
     public int Count => heap.Count;
-    
+
     public PriorityQueue()
     {
         heap = new List<PriorityQueueNode<T>>();
         itemToIndexMap = new Dictionary<T, int>();
     }
-    
+
     /// <summary>
-    /// Enqueue with priority
-    /// Time Complexity: O(log n)
+    /// Enqueue with priority (Time Complexity: O(log n))
     /// </summary>
     public void Enqueue(T item, float priority)
     {
         if (itemToIndexMap.ContainsKey(item))
         {
-            // Update priority if item already exists
             UpdatePriority(item, priority);
             return;
         }
-        
+
         var node = new PriorityQueueNode<T>(item, priority);
         heap.Add(node);
         int index = heap.Count - 1;
-        itemToIndexMap[item] = index;
-        
+        itemToIndexMap.Add(item, index);
+
         HeapifyUp(index);
     }
-    
+
     /// <summary>
-    /// Dequeue highest priority item (lowest priority value)
-    /// Time Complexity: O(log n)
+    /// Dequeue the item with the highest priority (Time Complexity: O(log n))
     /// </summary>
     public T Dequeue()
     {
-        if (heap.Count == 0)
-            throw new InvalidOperationException("Priority queue is empty");
-        
-        T result = heap[0].Item;
-        itemToIndexMap.Remove(result);
-        
-        // Move last element to root
-        int lastIndex = heap.Count - 1;
-        heap[0] = heap[lastIndex];
-        heap.RemoveAt(lastIndex);
-        
-        if (heap.Count > 0)
-        {
-            itemToIndexMap[heap[0].Item] = 0;
-            HeapifyDown(0);
-        }
-        
-        return result;
+        if (Count == 0)
+            throw new InvalidOperationException("PriorityQueue is empty.");
+
+        var rootItem = heap[0].Item;
+        RemoveAt(0);
+        return rootItem;
     }
-    
+
     /// <summary>
-    /// Peek at highest priority item without removing
-    /// Time Complexity: O(1)
+    /// Peek the item with the highest priority (Time Complexity: O(1))
     /// </summary>
     public T Peek()
     {
-        if (heap.Count == 0)
-            throw new InvalidOperationException("Priority queue is empty");
-        
+        if (Count == 0)
+            throw new InvalidOperationException("PriorityQueue is empty.");
         return heap[0].Item;
     }
-    
+
     /// <summary>
-    /// Check if item exists in queue
-    /// Time Complexity: O(1) - using hashtable lookup
-    /// </summary>
-    public bool Contains(T item)
-    {
-        return itemToIndexMap.ContainsKey(item);
-    }
-    
-    /// <summary>
-    /// Update priority of existing item
-    /// Time Complexity: O(log n)
+    /// Update the priority of an existing item (Time Complexity: O(log n))
     /// </summary>
     public void UpdatePriority(T item, float newPriority)
     {
         if (!itemToIndexMap.ContainsKey(item))
+        {
+            Debug.LogWarning("Item not found for priority update. Enqueueing instead.");
+            Enqueue(item, newPriority);
             return;
-        
+        }
+
         int index = itemToIndexMap[item];
         float oldPriority = heap[index].Priority;
-        heap[index].Priority = newPriority;
-        
-        // Heapify in appropriate direction
+
+        heap[index] = new PriorityQueueNode<T>(item, newPriority);
+
         if (newPriority < oldPriority)
-            HeapifyUp(index);
-        else if (newPriority > oldPriority)
-            HeapifyDown(index);
-    }
-    
-    /// <summary>
-    /// Remove specific item from queue
-    /// Time Complexity: O(log n)
-    /// </summary>
-    public bool Remove(T item)
-    {
-        if (!itemToIndexMap.ContainsKey(item))
-            return false;
-        
-        int index = itemToIndexMap[item];
-        itemToIndexMap.Remove(item);
-        
-        int lastIndex = heap.Count - 1;
-        if (index == lastIndex)
         {
-            heap.RemoveAt(lastIndex);
-            return true;
+            HeapifyUp(index);
         }
-        
-        // Replace with last element
-        heap[index] = heap[lastIndex];
-        heap.RemoveAt(lastIndex);
-        itemToIndexMap[heap[index].Item] = index;
-        
-        // Heapify in appropriate direction
-        HeapifyUp(index);
-        HeapifyDown(index);
-        
-        return true;
+        else if (newPriority > oldPriority)
+        {
+            HeapifyDown(index);
+        }
     }
-    
+
+    /// <summary>
+    /// Remove a specific item from the queue (Time Complexity: O(log n))
+    /// </summary>
+    public void Remove(T item)
+    {
+        if (!itemToIndexMap.ContainsKey(item)) return;
+
+        int index = itemToIndexMap[item];
+        RemoveAt(index);
+    }
+
+    /// <summary>
+    /// Check if item is in the queue (Time Complexity: O(1))
+    /// </summary>
+    public bool Contains(T item) => itemToIndexMap.ContainsKey(item);
+
     public void Clear()
     {
         heap.Clear();
         itemToIndexMap.Clear();
     }
-    
-    /// <summary>
-    /// Restore heap property upward
-    /// Time Complexity: O(log n) - height of tree
-    /// </summary>
+
+    private void RemoveAt(int index)
+    {
+        itemToIndexMap.Remove(heap[index].Item);
+
+        int lastIndex = heap.Count - 1;
+        if (index != lastIndex)
+        {
+            Swap(index, lastIndex);
+            heap.RemoveAt(lastIndex);
+
+            HeapifyDown(index);
+            HeapifyUp(index); // Safety check
+        }
+        else
+        {
+            heap.RemoveAt(lastIndex);
+        }
+    }
+
     private void HeapifyUp(int index)
     {
         while (index > 0)
         {
             int parentIndex = (index - 1) / 2;
-            
-            // Min-heap: parent should be smaller
-            if (heap[index].Priority >= heap[parentIndex].Priority)
+            if (heap[index].Priority < heap[parentIndex].Priority)
+            {
+                Swap(index, parentIndex);
+                index = parentIndex;
+            }
+            else
+            {
                 break;
-            
-            Swap(index, parentIndex);
-            index = parentIndex;
+            }
         }
     }
-    
-    /// <summary>
-    /// Restore heap property downward
-    /// Time Complexity: O(log n) - height of tree
-    /// </summary>
+
     private void HeapifyDown(int index)
     {
+        int count = heap.Count;
         while (true)
         {
-            int leftChild = 2 * index + 1;
-            int rightChild = 2 * index + 2;
+            int leftChildIndex = 2 * index + 1;
+            int rightChildIndex = 2 * index + 2;
             int smallest = index;
-            
-            // Find smallest among node and its children
-            if (leftChild < heap.Count && heap[leftChild].Priority < heap[smallest].Priority)
-                smallest = leftChild;
-            
-            if (rightChild < heap.Count && heap[rightChild].Priority < heap[smallest].Priority)
-                smallest = rightChild;
-            
-            // If current node is smallest, heap property is satisfied
+
+            if (leftChildIndex < count && heap[leftChildIndex].Priority < heap[smallest].Priority)
+                smallest = leftChildIndex;
+
+            if (rightChildIndex < count && heap[rightChildIndex].Priority < heap[smallest].Priority)
+                smallest = rightChildIndex;
+
             if (smallest == index)
                 break;
-            
+
             Swap(index, smallest);
             index = smallest;
         }
     }
-    
-    /// <summary>
-    /// Swap two nodes and update hashtable indices
-    /// Time Complexity: O(1)
-    /// </summary>
+
     private void Swap(int i, int j)
     {
         var temp = heap[i];
         heap[i] = heap[j];
         heap[j] = temp;
-        
-        // Update hashtable
+
         itemToIndexMap[heap[i].Item] = i;
         itemToIndexMap[heap[j].Item] = j;
     }
-    
+
     /// <summary>
-    /// Get all items in priority order (for debugging)
-    /// Time Complexity: O(n log n)
+    /// Get all items in priority order (Time Complexity: O(n log n))
     /// </summary>
     public List<T> GetAllInPriorityOrder()
     {
         var result = new List<T>();
         var tempQueue = new PriorityQueue<T>();
-        
-        // Copy all items to temp queue
+
         foreach (var node in heap)
         {
             tempQueue.Enqueue(node.Item, node.Priority);
         }
-        
-        // Dequeue in order
+
         while (tempQueue.Count > 0)
         {
             result.Add(tempQueue.Dequeue());
         }
-        
-        return result;
-    }
-}
 
-/// <summary>
-/// Node class for priority queue
-/// </summary>
-public class PriorityQueueNode<T>
-{
-    public T Item { get; set; }
-    public float Priority { get; set; }
-    
-    public PriorityQueueNode(T item, float priority)
-    {
-        Item = item;
-        Priority = priority;
+        return result;
     }
 }

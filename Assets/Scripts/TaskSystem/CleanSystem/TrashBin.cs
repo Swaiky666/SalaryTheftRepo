@@ -9,16 +9,16 @@ using UnityEngine.XR.Interaction.Toolkit;
 [RequireComponent(typeof(Collider))] // 确保有碰撞体
 public class TrashBin : MonoBehaviour
 {
-    [Header("音效设置")]
+    [Header("Audio Settings")]
     [SerializeField] private AudioSource audioSource; // 音效播放器
     [SerializeField] private AudioClip cleanSound; // 清理音效
     [SerializeField, Range(0f, 1f)] private float cleanVolume = 1f; // 清理音效音量
 
-    [Header("特效设置")]
+    [Header("Effect Settings")]
     [SerializeField] private ParticleSystem cleanEffect; // 清理特效
     [SerializeField] private float effectDuration = 1f; // 特效持续时间
 
-    [Header("调试设置")]
+    [Header("Debug Settings")]
     [SerializeField] private bool enableDebugLog = true; // 启用调试日志
 
     // 私有变量
@@ -36,158 +36,72 @@ public class TrashBin : MonoBehaviour
     {
         cleanSystem = system;
 
-        // 验证组件并配置触发器
-        ValidateComponents();
-
-        if (enableDebugLog)
-            Debug.Log($"[TrashBin] 垃圾桶 {name} 已初始化 (碰撞体触发检测)");
-    }
-
-    /// <summary>
-    /// 验证组件设置并确保碰撞体为触发器
-    /// </summary>
-    private void ValidateComponents()
-    {
-        // 1. 获取或添加AudioSource
-        if (audioSource == null)
-            audioSource = GetComponent<AudioSource>();
-
-        if (audioSource == null)
-        {
-            audioSource = gameObject.AddComponent<AudioSource>();
-            audioSource.playOnAwake = false;
-        }
-
-        // 2. 获取并配置碰撞体
+        // 获取碰撞体并确保是触发器
         trashBinCollider = GetComponent<Collider>();
-        if (trashBinCollider == null)
+        if (trashBinCollider != null)
         {
-            Debug.LogError($"[TrashBin] {name} 必须要有 Collider 组件才能进行触发检测!");
+            trashBinCollider.isTrigger = true;
         }
-        else
+        else if (enableDebugLog)
         {
-            // 确保碰撞体是触发器 (Is Trigger)
-            if (!trashBinCollider.isTrigger)
-            {
-                trashBinCollider.isTrigger = true;
-                if (enableDebugLog)
-                    Debug.LogWarning($"[TrashBin] {name} 的 Collider 已设置为 isTrigger = true");
-            }
-        }
-
-        // 3. 检查特效
-        if (cleanEffect == null)
-        {
-            cleanEffect = GetComponentInChildren<ParticleSystem>();
+            Debug.LogError("[TrashBin] Collider not found on TrashBin object!");
         }
     }
 
     /// <summary>
-    /// 碰撞体进入事件 (核心检测逻辑)
+    /// 触发器进入回调
     /// </summary>
-    /// <param name="other">进入的碰撞体</param>
-    void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
-        // 1. 检查进入的物体是否是垃圾 (通过标签)
         if (other.CompareTag("Rubbish"))
         {
-            GameObject rubbishObject = other.gameObject;
-
-            // 2. 检查是否已经在清理中，防止重复触发
-            if (rubbishObject != null && !beingCleanedRubbish.Contains(rubbishObject))
+            RubbishItem rubbishItem = other.GetComponent<RubbishItem>();
+            if (rubbishItem != null && !beingCleanedRubbish.Contains(other.gameObject))
             {
-                ProcessRubbish(rubbishObject);
+                ProcessRubbish(rubbishItem, other.gameObject);
             }
         }
     }
 
     /// <summary>
-    /// 处理检测到的垃圾
+    /// 处理进入垃圾桶的垃圾
     /// </summary>
+    /// <param name="rubbishItem">垃圾物品组件</param>
     /// <param name="rubbishObject">垃圾对象</param>
-    private void ProcessRubbish(GameObject rubbishObject)
+    private void ProcessRubbish(RubbishItem rubbishItem, GameObject rubbishObject)
     {
-        // 标记为正在处理
+        if (!rubbishItem.CanBeCleaned())
+        {
+            if (enableDebugLog) Debug.Log($"[TrashBin] Rubbish {rubbishObject.name} cannot be cleaned (already cleaned or not interactable).");
+            return;
+        }
+
+        // 标记为正在处理，防止重复触发
         beingCleanedRubbish.Add(rubbishObject);
 
-        if (enableDebugLog)
-            Debug.Log($"[TrashBin] {name} 检测到垃圾: {rubbishObject.name} (通过碰撞体触发)");
-
-        // 开始清理垃圾的协程
-        StartCoroutine(CleanRubbishRoutine(rubbishObject));
-    }
-
-    /// <summary>
-    /// 清理垃圾协程
-    /// </summary>
-    /// <param name="rubbishObject">要清理的垃圾</param>
-    private IEnumerator CleanRubbishRoutine(GameObject rubbishObject)
-    {
-        // 播放清理音效
+        // 1. 播放音效和特效
         PlayCleanSound();
-
-        // 播放清理特效
         PlayCleanEffect();
 
-        // 移除VR交互组件
-        RemoveVRInteractable(rubbishObject);
+        // 2. 尝试让 RubbishItem 完成清理流程
+        rubbishItem.TryClean();
 
-        // 改变标签，防止二次触发
-        rubbishObject.tag = "Untagged";
-
-        // 等待特效播放完成
-        yield return new WaitForSeconds(effectDuration);
-
-        // 通知清理系统
-        if (cleanSystem != null)
-        {
-            cleanSystem.OnRubbishCleanedCallback(rubbishObject);
-        }
-
-        // 销毁垃圾对象
-        if (rubbishObject != null)
-        {
-            Destroy(rubbishObject);
-        }
-
-        // 从处理列表中移除
-        beingCleanedRubbish.Remove(rubbishObject);
+        // 3. 移除标记（需要延迟，因为 RubbishItem 内部有协程）
+        StartCoroutine(RemoveFromProcessingList(rubbishObject));
 
         if (enableDebugLog)
-            Debug.Log($"[TrashBin] {name} 已清理垃圾: {rubbishObject?.name}");
+            Debug.Log($"[TrashBin] Rubbish {rubbishObject.name} detected and starting clean process.");
     }
 
     /// <summary>
-    /// 移除VR交互组件
+    /// 延迟移除正在处理列表
     /// </summary>
-    /// <param name="rubbishObject">垃圾对象</param>
-    private void RemoveVRInteractable(GameObject rubbishObject)
+    private IEnumerator RemoveFromProcessingList(GameObject rubbishObject)
     {
-        // 移除XR Grab Interactable组件
-        XRGrabInteractable grabInteractable = rubbishObject.GetComponent<XRGrabInteractable>();
-        if (grabInteractable != null)
-        {
-            // 如果正在被抓取，先释放
-            if (grabInteractable.isSelected)
-            {
-                grabInteractable.interactionManager.SelectExit(
-                    grabInteractable.firstInteractorSelecting,
-                    grabInteractable
-                );
-            }
+        // 等待一段时间，确保 RubbishItem.TryClean() 内部逻辑完成
+        yield return new WaitForSeconds(1.0f);
 
-            Destroy(grabInteractable);
-
-            if (enableDebugLog)
-                Debug.Log($"[TrashBin] 已移除 {rubbishObject.name} 的 XRGrabInteractable 组件");
-        }
-
-        // 也可以移除其他相关的交互组件
-        XRSimpleInteractable simpleInteractable = rubbishObject.GetComponent<XRSimpleInteractable>();
-        if (simpleInteractable != null)
-        {
-            Destroy(simpleInteractable);
-        }
+        beingCleanedRubbish.Remove(rubbishObject);
     }
 
     /// <summary>
@@ -216,41 +130,23 @@ public class TrashBin : MonoBehaviour
 
     /// <summary>
     /// 手动触发检测（调试用）
-    /// 注意：碰撞体检测无法手动触发，此方法现在仅用于提示。
     /// </summary>
-    [ContextMenu("手动触发 (仅提示)")]
+    [ContextMenu("Manual Trigger (Hint Only)")]
     public void ManualDetection()
     {
-        Debug.LogWarning("[TrashBin] 碰撞体检测依赖物理系统，无法手动触发，请将带有'Rubbish'标签的物体放入垃圾桶碰撞体中测试。");
+        Debug.LogWarning("[TrashBin] Collider detection relies on the physics system and cannot be manually triggered. Please place an object with the 'Rubbish' tag into the trash bin collider for testing.");
     }
 
     /// <summary>
     /// 检查垃圾桶状态（调试用）
     /// </summary>
-    [ContextMenu("检查状态")]
+    [ContextMenu("Check Status")]
     public void CheckStatus()
     {
-        Debug.Log($"[TrashBin] === 垃圾桶 {name} 状态 ===");
-        Debug.Log($"检测类型: 碰撞体触发器 (OnTriggerEnter)");
-        Debug.Log($"碰撞体 IsTrigger: {(trashBinCollider != null ? trashBinCollider.isTrigger.ToString() : "N/A")}");
-        Debug.Log($"清理系统引用: {(cleanSystem != null ? "已设置" : "未设置")}");
-        Debug.Log($"当前正在清理的垃圾数量: {beingCleanedRubbish.Count}");
-        Debug.Log($"音效组件: {(audioSource != null ? "已设置" : "未设置")}");
-        Debug.Log($"特效组件: {(cleanEffect != null ? "已设置" : "未设置")}");
-    }
-
-    /// <summary>
-    /// 测试清理特效（调试用）
-    /// </summary>
-    [ContextMenu("测试特效")]
-    public void TestEffect()
-    {
-        PlayCleanSound();
-        PlayCleanEffect();
-    }
-
-    void OnDestroy()
-    {
-        // 碰撞体检测无需停止协程
+        Debug.Log($"[TrashBin] === Trash Bin {name} Status ===");
+        Debug.Log($"Detection Type: Collider Trigger (OnTriggerEnter)");
+        Debug.Log($"Collider IsTrigger: {(trashBinCollider != null ? trashBinCollider.isTrigger.ToString() : "N/A")}");
+        Debug.Log($"Clean System Reference: {(cleanSystem != null ? "Set" : "Not Set")}");
+        Debug.Log($"Currently Processing Rubbish Count: {beingCleanedRubbish.Count}");
     }
 }
