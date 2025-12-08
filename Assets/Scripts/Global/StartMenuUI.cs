@@ -125,7 +125,18 @@ public class StartMenuUI : MonoBehaviour
     public void OnStartGameClicked()
     {
         PlayButtonClickSFX();
-        sceneController.LoadInGameScene();
+
+        // **修改点：检查教程状态**
+        if (TutorialManager.IsTutorialCompleted())
+        {
+            // 教程已完成，直接加载游戏场景
+            sceneController.LoadInGameScene();
+        }
+        else
+        {
+            // 教程未完成，加载教程场景
+            sceneController.LoadScene("TutorialScene");
+        }
     }
 
     public void OnSettingsClicked()
