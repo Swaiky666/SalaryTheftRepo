@@ -5,6 +5,10 @@ using System;
 
 public class GameLogicSystem : MonoBehaviour
 {
+    // --- PlayerPrefs Keys for Persistence ---
+    private const string JobLevelKey = "JobLevel";
+    private const string StressRateKey = "StressRate";
+
     [Header("工作时间设置")]
     [SerializeField] private float workTimeMinutes = 8f; // 工作时间（分钟）
     [SerializeField] private Slider workTimeSlider; // 工作时间显示的滑块
@@ -23,6 +27,7 @@ public class GameLogicSystem : MonoBehaviour
     [SerializeField] private TextMeshProUGUI positionText; // 职位显示文本
 
     [Header("压力指数设置")]
+    // 此值在InitializeSystem中从PlayerPrefs加载，并在成功时更新
     [SerializeField] private float stressIncreaseRate = 1f; // 压力增长速度倍率
     [SerializeField] private float stressLevel = 0f; // 当前压力值 0-100
     [SerializeField] private Slider stressSlider; // 压力指数显示的滑块
@@ -35,6 +40,7 @@ public class GameLogicSystem : MonoBehaviour
     private int currentSalary; // 当前薪资
     private JobLevel currentJobLevel = JobLevel.Junior; // 当前职位等级
     private float baseStressGrowthRate; // 基础压力增长速度（每秒）
+    private bool isGameOver = false; // 游戏是否结束的标记
 
     // 职位等级枚举
     public enum JobLevel
@@ -52,6 +58,8 @@ public class GameLogicSystem : MonoBehaviour
     public static event Action<JobLevel> OnJobLevelChanged; // 职位变化事件
     public static event Action<float> OnStressChanged; // 压力变化事件
     public static event Action<float> OnStressPenalty; // 压力惩罚事件（外部增加压力时触发）
+    public static event Action OnGameOver; // 游戏失败结束事件（例如压力爆表或时间到未完成）
+    public static event Action OnWorkSuccess; // 工作成功完成事件
 
     void Start()
     {
@@ -60,30 +68,58 @@ public class GameLogicSystem : MonoBehaviour
 
     void Update()
     {
+        if (isGameOver) return;
+
         UpdateWorkTime();
         UpdateStress();
+        CheckGameOver(); // 检查游戏结束条件
     }
 
     /// <summary>
-    /// 初始化系统
+    /// **静态方法：重置游戏进度到初始状态 (最低职位, 初始难度)**
+    /// 在新游戏开始时调用，清除PlayerPrefs中的持久化数据。
+    /// </summary>
+    public static void ResetGameProgress()
+    {
+        // 1. 重置职位等级为 Junior (0)
+        PlayerPrefs.SetInt(JobLevelKey, (int)JobLevel.Junior);
+
+        // 2. 重置压力倍率为 1.0f (初始值)
+        PlayerPrefs.SetFloat(StressRateKey, 1f);
+
+        // 3. 确保保存更改
+        PlayerPrefs.Save();
+
+        Debug.Log("[GameLogicSystem] 游戏进度已初始化/重置。职位: Junior, 压力倍率: 1.0");
+    }
+
+    /// <summary>
+    /// 初始化系统，加载持久化数据
     /// </summary>
     private void InitializeSystem()
     {
+        // 加载持久化数据或使用默认值
+        // 从PlayerPrefs加载职位等级，如果不存在则默认为 Junior(0)
+        currentJobLevel = (JobLevel)PlayerPrefs.GetInt(JobLevelKey, (int)JobLevel.Junior);
+        // 从PlayerPrefs加载压力倍率，如果不存在则默认为 1.0f
+        stressIncreaseRate = PlayerPrefs.GetFloat(StressRateKey, 1f);
+
         // 初始化工作时间
         maxWorkTime = workTimeMinutes * 60f; // 转换为秒
         workTimeRemaining = maxWorkTime;
 
-        // 初始化薪资
-        UpdateSalary();
-
-        // 初始化职位
-        UpdatePositionText();
-
-        // 计算基础压力增长速度（1分钟内从0%增长到100%）
+        // 计算基础压力增长速度（1分钟内从0%增长到100%），使用加载的倍率
         baseStressGrowthRate = (100f / 60f) * stressIncreaseRate;
+
+        // 初始化薪资和职位
+        UpdateSalary();
+        UpdatePositionText();
+        ResetStress(); // 确保新的一天压力从0开始
 
         // 更新UI
         UpdateUI();
+
+        Debug.Log($"[GameLogicSystem] 系统初始化: 职位: {currentJobLevel}, 压力倍率: {stressIncreaseRate:F2}");
     }
 
     /// <summary>
@@ -104,6 +140,10 @@ public class GameLogicSystem : MonoBehaviour
 
             OnWorkTimeChanged?.Invoke(workTimeRemaining);
         }
+        else if (workTimeRemaining <= 0)
+        {
+            workTimeRemaining = 0;
+        }
     }
 
     /// <summary>
@@ -118,6 +158,108 @@ public class GameLogicSystem : MonoBehaviour
             UpdateStressUI();
             OnStressChanged?.Invoke(stressLevel);
         }
+        else
+        {
+            stressLevel = 100f;
+            UpdateStressUI();
+        }
+    }
+
+    /// <summary>
+    /// 检查游戏结束条件 (成功或失败)
+    /// </summary>
+    private void CheckGameOver()
+    {
+        bool successConditionMet = false;
+        bool failConditionMet = false;
+
+        // 成功条件: 工作时间结束 AND 工作进度完成
+        if (workTimeRemaining <= 0f && workProgress >= 100f)
+        {
+            Debug.Log("[GameLogicSystem] 工作成功完成！准备升级并开始下一轮。");
+            successConditionMet = true;
+        }
+        // 失败条件1: 压力值达到100%
+        else if (stressLevel >= 100f)
+        {
+            Debug.Log("[GameLogicSystem] 游戏失败: 压力值过高！");
+            failConditionMet = true;
+        }
+        // 失败条件2: 工作时间结束 AND 工作进度未满
+        else if (workTimeRemaining <= 0f && workProgress < 100f)
+        {
+            Debug.Log("[GameLogicSystem] 游戏失败: 工作未完成且时间用尽！");
+            failConditionMet = true;
+        }
+
+        if (successConditionMet && !isGameOver)
+        {
+            isGameOver = true;
+            OnWorkSuccess?.Invoke();
+            HandleWorkSuccess();
+        }
+        else if (failConditionMet && !isGameOver)
+        {
+            isGameOver = true;
+            OnGameOver?.Invoke(); // 触发游戏失败事件（闪烁/场景切换到StartMenu）
+        }
+    }
+
+    /// <summary>
+    /// 处理工作成功完成的逻辑：升职、增加难度、重置场景
+    /// </summary>
+    private void HandleWorkSuccess()
+    {
+        // 1. 升职 (如果未达到最高级)
+        PromoteJobLevel();
+
+        // 2. 增加难度 (压力增长率 * 1.2)
+        const float difficultyMultiplier = 1.2f;
+        stressIncreaseRate *= difficultyMultiplier;
+
+        // 重新计算基础增长率以应用新的难度
+        baseStressGrowthRate = (100f / 60f) * stressIncreaseRate;
+
+        // 3. 保存新的难度和职位等级
+        PlayerPrefs.SetFloat(StressRateKey, stressIncreaseRate);
+        PlayerPrefs.SetInt(JobLevelKey, (int)currentJobLevel);
+        PlayerPrefs.Save();
+
+        Debug.Log($"[GameLogicSystem] 难度升级！新压力倍率: {stressIncreaseRate:F2}。当前职位: {currentJobLevel}");
+
+        // 4. 重新加载场景，开始新的一天
+        SceneController sceneController = FindObjectOfType<SceneController>();
+        if (sceneController != null)
+        {
+            sceneController.LoadScene("InGame");
+        }
+        else
+        {
+            Debug.LogError("[GameLogicSystem] 未找到 SceneController 无法加载 InGame 场景！");
+        }
+    }
+
+    /// <summary>
+    /// 提升职位等级（在工作日成功结束后调用）
+    /// </summary>
+    private void PromoteJobLevel()
+    {
+        JobLevel nextLevel = currentJobLevel;
+
+        if (currentJobLevel == JobLevel.Junior)
+        {
+            nextLevel = JobLevel.Intermediate;
+        }
+        else if (currentJobLevel == JobLevel.Intermediate)
+        {
+            nextLevel = JobLevel.Senior;
+        }
+        // 如果已经是Senior，则保持不变
+
+        if (nextLevel != currentJobLevel)
+        {
+            SetJobLevel(nextLevel);
+        }
     }
 
     /// <summary>
@@ -130,9 +272,6 @@ public class GameLogicSystem : MonoBehaviour
         workProgress = Mathf.Clamp(workProgress, 0f, 100f);
         UpdateWorkProgressUI();
         OnWorkProgressChanged?.Invoke(workProgress);
-
-        // 检查是否需要升职
-        CheckForPromotion();
     }
 
     /// <summary>
@@ -262,28 +401,6 @@ public class GameLogicSystem : MonoBehaviour
         currentSalaryDeduction = 0;
         UpdateSalary();
         Debug.Log("[GameLogicSystem] 薪资扣除已重置");
-    }
-
-    /// <summary>
-    /// 检查升职条件
-    /// </summary>
-    private void CheckForPromotion()
-    {
-        JobLevel newLevel = currentJobLevel;
-
-        if (workProgress >= 100f && currentJobLevel == JobLevel.Junior)
-        {
-            newLevel = JobLevel.Intermediate;
-        }
-        else if (workProgress >= 200f && currentJobLevel == JobLevel.Intermediate)
-        {
-            newLevel = JobLevel.Senior;
-        }
-
-        if (newLevel != currentJobLevel)
-        {
-            SetJobLevel(newLevel);
-        }
     }
 
     /// <summary>
@@ -478,7 +595,7 @@ public class GameLogicSystem : MonoBehaviour
     {
         if (!showDebugInfo) return;
 
-        GUILayout.BeginArea(new Rect(10, 10, 350, 250));
+        GUILayout.BeginArea(new Rect(10, 10, 350, 300));
         GUILayout.Label($"工作时间剩余: {workTimeRemaining:F1}秒");
         GUILayout.Label($"工作进度: {workProgress:F1}%");
         GUILayout.Label($"基础薪资: ${currentSalary:N0}");
@@ -486,6 +603,8 @@ public class GameLogicSystem : MonoBehaviour
         GUILayout.Label($"实际薪资: ${GetActualSalary():N0}");
         GUILayout.Label($"职位等级: {currentJobLevel}");
         GUILayout.Label($"压力指数: {stressLevel:F1}%");
+        GUILayout.Label($"**压力倍率**: {stressIncreaseRate:F2} (难度)");
+        GUILayout.Label($"游戏状态: {(isGameOver ? "已结束" : "进行中")}");
         GUILayout.EndArea();
     }
 #endif

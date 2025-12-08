@@ -35,75 +35,30 @@ public class StartMenuUI : MonoBehaviour
     [Header("References")]
     [SerializeField] private SceneController sceneController;
 
+    // ********** 新增配置 **********
+    [Header("新游戏设置")]
+    [Tooltip("勾选此项则'开始游戏'按钮会加载'Tutorial'场景，否则加载'InGame'场景。")]
+    [SerializeField] private bool loadTutorialScene = false;
+    // ****************************
+
     [Header("Audio Feedback (Optional)")]
     [SerializeField] private AudioClip buttonClickSFX;
-    [SerializeField] private AudioClip buttonErrorSFX; // 失败反馈音效
-
-    private const float VolumeStep = 0.1f; // 音量调节步长
 
     private void Start()
     {
-        if (sceneController == null)
-        {
-            sceneController = FindObjectOfType<SceneController>();
-            if (sceneController == null)
-            {
-                GameObject sceneControllerObj = new GameObject("SceneController");
-                sceneController = sceneControllerObj.AddComponent<SceneController>();
-            }
-        }
-
+        InitializeUI();
         BindButtonEvents();
-        InitializeVolumeSliders();
         ShowMainMenu();
     }
 
-    /// <summary>
-    /// 绑定所有按钮和滑条的事件
-    /// </summary>
-    private void BindButtonEvents()
+    private void OnDestroy()
     {
-        // 绑定主菜单按钮
-        if (startGameButton != null)
-            startGameButton.OnClicked.AddListener(OnStartGameClicked);
-
-        if (settingsButton != null)
-            settingsButton.OnClicked.AddListener(OnSettingsClicked);
-
-        if (quitButton != null)
-            quitButton.OnClicked.AddListener(OnQuitClicked);
-
-        // 绑定设置面板返回按钮
-        if (backButton != null)
-            backButton.OnClicked.AddListener(OnBackClicked);
-
-        // 绑定四个音量控制按钮事件
-        if (musicVolumeUpButton != null)
-            musicVolumeUpButton.OnClicked.AddListener(OnMusicVolumeUpClicked);
-
-        if (musicVolumeDownButton != null)
-            musicVolumeDownButton.OnClicked.AddListener(OnMusicVolumeDownClicked);
-
-        if (sfxVolumeUpButton != null)
-            sfxVolumeUpButton.OnClicked.AddListener(OnSFXVolumeUpClicked);
-
-        if (sfxVolumeDownButton != null)
-            sfxVolumeDownButton.OnClicked.AddListener(OnSFXVolumeDownClicked);
-
-
-        // 音量滑条事件
-        if (musicVolumeSlider != null)
-            musicVolumeSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
-
-        if (sfxVolumeSlider != null)
-            sfxVolumeSlider.onValueChanged.AddListener(OnSFXVolumeChanged);
+        UnbindButtonEvents();
     }
 
-    /// <summary>
-    /// 初始化音量滑条
-    /// </summary>
-    private void InitializeVolumeSliders()
+    private void InitializeUI()
     {
+        // 初始化音量滑块和文本
         if (AudioManager.Instance != null)
         {
             if (musicVolumeSlider != null)
@@ -111,7 +66,6 @@ public class StartMenuUI : MonoBehaviour
                 musicVolumeSlider.value = AudioManager.Instance.GetMusicVolume();
                 UpdateMusicVolumeText(musicVolumeSlider.value);
             }
-
             if (sfxVolumeSlider != null)
             {
                 sfxVolumeSlider.value = AudioManager.Instance.GetSFXVolume();
@@ -120,124 +74,126 @@ public class StartMenuUI : MonoBehaviour
         }
     }
 
-    #region Button Click Handlers (主菜单/返回)
-
-    public void OnStartGameClicked()
+    private void BindButtonEvents()
     {
-        PlayButtonClickSFX();
+        // 绑定主菜单按钮
+        if (startGameButton != null)
+            startGameButton.OnClicked.AddListener(OnStartGameClicked);
+        if (settingsButton != null)
+            settingsButton.OnClicked.AddListener(ShowSettingsPanel);
+        if (quitButton != null)
+            quitButton.OnClicked.AddListener(OnQuitGameClicked);
 
-        // **修改点：检查教程状态**
-        if (TutorialManager.IsTutorialCompleted())
+        // 绑定设置面板按钮
+        if (backButton != null)
+            backButton.OnClicked.AddListener(ShowMainMenu);
+
+        // 绑定音量滑块事件
+        if (musicVolumeSlider != null)
+            musicVolumeSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
+        if (sfxVolumeSlider != null)
+            sfxVolumeSlider.onValueChanged.AddListener(OnSFXVolumeChanged);
+
+        // 绑定音量控制按钮 (可选)
+        if (musicVolumeUpButton != null)
+            musicVolumeUpButton.OnClicked.AddListener(() => ChangeVolume(musicVolumeSlider, 0.05f));
+        if (musicVolumeDownButton != null)
+            musicVolumeDownButton.OnClicked.AddListener(() => ChangeVolume(musicVolumeSlider, -0.05f));
+        if (sfxVolumeUpButton != null)
+            sfxVolumeUpButton.OnClicked.AddListener(() => ChangeVolume(sfxVolumeSlider, 0.05f));
+        if (sfxVolumeDownButton != null)
+            sfxVolumeDownButton.OnClicked.AddListener(() => ChangeVolume(sfxVolumeSlider, -0.05f));
+    }
+
+    private void UnbindButtonEvents()
+    {
+        // 解绑主菜单按钮
+        if (startGameButton != null)
+            startGameButton.OnClicked.RemoveListener(OnStartGameClicked);
+        if (settingsButton != null)
+            settingsButton.OnClicked.RemoveListener(ShowSettingsPanel);
+        if (quitButton != null)
+            quitButton.OnClicked.RemoveListener(OnQuitGameClicked);
+
+        // 解绑设置面板按钮
+        if (backButton != null)
+            backButton.OnClicked.RemoveListener(ShowMainMenu);
+
+        // 解绑音量滑块事件
+        if (musicVolumeSlider != null)
+            musicVolumeSlider.onValueChanged.RemoveListener(OnMusicVolumeChanged);
+        if (sfxVolumeSlider != null)
+            sfxVolumeSlider.onValueChanged.RemoveListener(OnSFXVolumeChanged);
+
+        // 解绑音量控制按钮 (可选)
+        if (musicVolumeUpButton != null)
+            musicVolumeUpButton.OnClicked.RemoveAllListeners();
+        if (musicVolumeDownButton != null)
+            musicVolumeDownButton.OnClicked.RemoveAllListeners();
+        if (sfxVolumeUpButton != null)
+            sfxVolumeUpButton.OnClicked.RemoveAllListeners();
+        if (sfxVolumeDownButton != null)
+            sfxVolumeDownButton.OnClicked.RemoveAllListeners();
+    }
+
+    #region Button Handlers
+
+    /// <summary>
+    /// **处理开始游戏点击事件，根据 loadTutorialScene 决定加载场景**
+    /// </summary>
+    private void OnStartGameClicked()
+    {
+        PlayButtonClickSound();
+
+        if (sceneController == null)
         {
-            // 教程已完成，直接加载游戏场景
-            sceneController.LoadInGameScene();
+            Debug.LogError("[StartMenuUI] SceneController 引用丢失，无法加载场景！请确保已在 Inspector 中设置。");
+            return;
+        }
+
+        if (loadTutorialScene)
+        {
+            // 调用 SceneController 的方法，该方法会自动调用 GameLogicSystem.ResetGameProgress()
+            sceneController.LoadTutorialScene();
         }
         else
         {
-            // 教程未完成，加载教程场景
-            sceneController.LoadScene("TutorialScene");
+            // 调用 SceneController 的方法，该方法会自动调用 GameLogicSystem.ResetGameProgress()
+            sceneController.LoadInGameScene();
         }
     }
 
-    public void OnSettingsClicked()
+    private void OnQuitGameClicked()
     {
-        PlayButtonClickSFX();
-        ShowSettingsPanel();
-    }
-
-    public void OnQuitClicked()
-    {
-        PlayButtonClickSFX();
-        sceneController.QuitGame();
-    }
-
-    public void OnBackClicked()
-    {
-        PlayButtonClickSFX();
-        ShowMainMenu();
-    }
-
-    #endregion
-
-    #region Volume Control Buttons
-
-    public void OnMusicVolumeUpClicked()
-    {
-        ChangeMusicVolume(VolumeStep);
-    }
-
-    public void OnMusicVolumeDownClicked()
-    {
-        ChangeMusicVolume(-VolumeStep);
-    }
-
-    public void OnSFXVolumeUpClicked()
-    {
-        ChangeSFXVolume(VolumeStep);
-    }
-
-    public void OnSFXVolumeDownClicked()
-    {
-        ChangeSFXVolume(-VolumeStep);
-    }
-
-    /// <summary>
-    /// 统一处理音乐音量变化 (± step)
-    /// </summary>
-    private void ChangeMusicVolume(float step)
-    {
-        if (musicVolumeSlider != null)
+        PlayButtonClickSound();
+        if (sceneController != null)
         {
-            float currentValue = musicVolumeSlider.value;
-            float newValue = Mathf.Clamp01(currentValue + step);
-
-            if (newValue == currentValue && AudioManager.Instance != null && step != 0)
-            {
-                // 如果值没有变化 (达到0或1)，播放错误音效
-                if (buttonErrorSFX != null)
-                {
-                    AudioManager.Instance.PlaySFX(buttonErrorSFX);
-                }
-                Debug.Log($"[Volume] 音乐音量已达到 {(step > 0 ? "上限" : "下限")}。");
-                return;
-            }
-
-            // 成功，播放点击音效并更新 Slider
-            PlayButtonClickSFX();
-            musicVolumeSlider.value = newValue;
+            sceneController.QuitGame();
+        }
+        else
+        {
+            Application.Quit();
         }
     }
 
-    /// <summary>
-    /// 统一处理音效音量变化 (± step)
-    /// </summary>
-    private void ChangeSFXVolume(float step)
+    private void PlayButtonClickSound()
     {
-        if (sfxVolumeSlider != null)
+        if (AudioManager.Instance != null && buttonClickSFX != null)
         {
-            float currentValue = sfxVolumeSlider.value;
-            float newValue = Mathf.Clamp01(currentValue + step);
-
-            if (newValue == currentValue && AudioManager.Instance != null && step != 0)
-            {
-                // 如果值没有变化 (达到0或1)，播放错误音效
-                if (buttonErrorSFX != null)
-                {
-                    AudioManager.Instance.PlaySFX(buttonErrorSFX);
-                }
-                Debug.Log($"[Volume] 音效音量已达到 {(step > 0 ? "上限" : "下限")}。");
-                return;
-            }
-
-            // 成功，播放点击音效并更新 Slider
-            PlayButtonClickSFX();
-            sfxVolumeSlider.value = newValue;
+            // 使用音效源播放音效，不随物体销毁而消失
+            AudioManager.Instance.PlaySFX(buttonClickSFX);
         }
     }
 
     #endregion
 
-    #region Volume Control (滑条拖动和显示更新)
+    #region Volume Control
+
+    private void ChangeVolume(Slider slider, float delta)
+    {
+        slider.value = Mathf.Clamp01(slider.value + delta);
+        // 滑块的 onValueChanged 事件会自动触发 OnMusicVolumeChanged / OnSFXVolumeChanged
+    }
 
     private void OnMusicVolumeChanged(float value)
     {
@@ -277,7 +233,7 @@ public class StartMenuUI : MonoBehaviour
 
     #region Panel Management
 
-    private void ShowMainMenu()
+    public void ShowMainMenu()
     {
         if (mainMenuPanel != null)
             mainMenuPanel.SetActive(true);
@@ -286,25 +242,14 @@ public class StartMenuUI : MonoBehaviour
             settingsPanel.SetActive(false);
     }
 
-    private void ShowSettingsPanel()
+    public void ShowSettingsPanel()
     {
+        PlayButtonClickSound();
         if (mainMenuPanel != null)
             mainMenuPanel.SetActive(false);
 
         if (settingsPanel != null)
             settingsPanel.SetActive(true);
-    }
-
-    #endregion
-
-    #region Audio Feedback
-
-    private void PlayButtonClickSFX()
-    {
-        if (AudioManager.Instance != null && buttonClickSFX != null)
-        {
-            AudioManager.Instance.PlaySFX(buttonClickSFX);
-        }
     }
 
     #endregion

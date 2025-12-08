@@ -1,40 +1,46 @@
-using System.Collections;
+ï»¿using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class StressFlashEffect : MonoBehaviour
 {
-    [Header("ÉÁË¸ÉèÖÃ")]
-    public Image flashImage; // ÍÏ×§Ò»¸öÈ«ÆÁµÄºìÉ«Imageµ½ÕâÀï
+    [Header("é—ªçƒè®¾ç½®")]
+    public Image flashImage; // æ‹–æ‹½ä¸€ä¸ªå…¨å±çš„çº¢è‰²Imageåˆ°è¿™é‡Œ
 
-    [Header("Ñ¹Á¦ãĞÖµÉèÖÃ")]
-    public float stressThreshold = 70f; // ¿ªÊ¼ÉÁË¸µÄÑ¹Á¦ãĞÖµ
+    [Header("å‹åŠ›é˜ˆå€¼è®¾ç½®")]
+    public float stressThreshold = 70f; // å¼€å§‹é—ªçƒçš„å‹åŠ›é˜ˆå€¼
 
-    [Header("ÉÁË¸Ç¿¶ÈÉèÖÃ")]
-    public float minFlashSpeed = 1f; // ×îĞ¡ÉÁË¸ËÙ¶È£¨Ñ¹Á¦70%Ê±£©
-    public float maxFlashSpeed = 4f; // ×î´óÉÁË¸ËÙ¶È£¨Ñ¹Á¦100%Ê±£©
-    public float minAlpha = 0.1f; // ×îĞ¡Í¸Ã÷¶È£¨Ñ¹Á¦70%Ê±£©
-    public float maxAlpha = 0.5f; // ×î´óÍ¸Ã÷¶È£¨Ñ¹Á¦100%Ê±£©
+    [Header("é—ªçƒå¼ºåº¦è®¾ç½®")]
+    public float minFlashSpeed = 1f; // æœ€å°é—ªçƒé€Ÿåº¦ï¼ˆå‹åŠ›70%æ—¶ï¼‰
+    public float maxFlashSpeed = 4f; // æœ€å¤§é—ªçƒé€Ÿåº¦ï¼ˆå‹åŠ›100%æ—¶ï¼‰
+    public float minAlpha = 0.1f; // æœ€å°é€æ˜åº¦ï¼ˆå‹åŠ›70%æ—¶ï¼‰
+    public float maxAlpha = 0.5f; // æœ€å¤§é€æ˜åº¦ï¼ˆå‹åŠ›100%æ—¶ï¼‰
 
-    [Header("³Í·£ÉÁË¸ÉèÖÃ")]
-    public float penaltyFlashAlpha = 0.8f; // ³Í·£ÉÁË¸µÄÍ¸Ã÷¶È
-    public float penaltyFlashDuration = 0.15f; // Ã¿´Î³Í·£ÉÁË¸³ÖĞøÊ±¼ä
-    public int penaltyFlashCount = 2; // ³Í·£ÉÁË¸´ÎÊı
+    [Header("æƒ©ç½šé—ªçƒè®¾ç½®")]
+    public float penaltyFlashAlpha = 0.8f; // æƒ©ç½šé—ªçƒçš„é€æ˜åº¦
+    public float penaltyFlashDuration = 0.15f; // æ¯æ¬¡æƒ©ç½šé—ªçƒæŒç»­æ—¶é—´
+    public int penaltyFlashCount = 2; // æƒ©ç½šé—ªçƒæ¬¡æ•°
 
-    // Ë½ÓĞ±äÁ¿
+    [Header("æ¸¸æˆç»“æŸé—ªçƒè®¾ç½®")]
+    public float gameOverFlashSpeed = 10f; // æ¸¸æˆç»“æŸæ—¶å¿«é€Ÿé—ªçƒçš„é€Ÿåº¦
+    public float gameOverSolidRedDuration = 1.5f; // å®Œå…¨å˜çº¢çš„æŒç»­æ—¶é—´
+    public float gameOverFlashAlpha = 0.8f; // æ¸¸æˆç»“æŸæ—¶çš„é—ªçƒé€æ˜åº¦
+
+    // ç§æœ‰å˜é‡
     private bool isFlashing = false;
     private Coroutine flashCoroutine;
     private Coroutine penaltyFlashCoroutine;
+    private Coroutine gameOverCoroutine; // æ¸¸æˆç»“æŸåç¨‹
     private GameLogicSystem gameLogicSystem;
     private float currentFlashSpeed;
     private float currentMaxAlpha;
 
     void Start()
     {
-        // ÕÒµ½GameLogicSystem×é¼ş
+        // æ‰¾åˆ°GameLogicSystemç»„ä»¶
         gameLogicSystem = FindObjectOfType<GameLogicSystem>();
 
-        // È·±£Image³õÊ¼×´Ì¬ÊÇÍ¸Ã÷µÄ
+        // ç¡®ä¿Imageåˆå§‹çŠ¶æ€æ˜¯é€æ˜çš„
         if (flashImage != null)
         {
             Color color = flashImage.color;
@@ -42,23 +48,26 @@ public class StressFlashEffect : MonoBehaviour
             flashImage.color = color;
         }
 
-        // ¶©ÔÄÑ¹Á¦±ä»¯ÊÂ¼ş
+        // è®¢é˜…å‹åŠ›å˜åŒ–äº‹ä»¶
         GameLogicSystem.OnStressChanged += OnStressChanged;
-        // ¶©ÔÄÑ¹Á¦³Í·£ÊÂ¼ş
+        // è®¢é˜…å‹åŠ›æƒ©ç½šäº‹ä»¶
         GameLogicSystem.OnStressPenalty += OnStressPenalty;
+        // è®¢é˜…æ¸¸æˆç»“æŸäº‹ä»¶
+        GameLogicSystem.OnGameOver += OnGameOver;
     }
 
     void OnDestroy()
     {
-        // È¡Ïû¶©ÔÄÊÂ¼ş
+        // å–æ¶ˆè®¢é˜…äº‹ä»¶
         GameLogicSystem.OnStressChanged -= OnStressChanged;
         GameLogicSystem.OnStressPenalty -= OnStressPenalty;
+        GameLogicSystem.OnGameOver -= OnGameOver;
     }
 
     /// <summary>
-    /// µ±Ñ¹Á¦Öµ¸Ä±äÊ±µ÷ÓÃ
+    /// å½“å‹åŠ›å€¼æ”¹å˜æ—¶è°ƒç”¨
     /// </summary>
-    /// <param name="newStressLevel">ĞÂµÄÑ¹Á¦Öµ</param>
+    /// <param name="newStressLevel">æ–°çš„å‹åŠ›å€¼</param>
     private void OnStressChanged(float newStressLevel)
     {
         if (newStressLevel >= stressThreshold && !isFlashing)
@@ -71,18 +80,81 @@ public class StressFlashEffect : MonoBehaviour
         }
         else if (isFlashing)
         {
-            // ¸üĞÂÉÁË¸Ç¿¶È
+            // æ›´æ–°é—ªçƒå¼ºåº¦
             UpdateFlashIntensity(newStressLevel);
         }
     }
 
     /// <summary>
-    /// µ±Ñ¹Á¦Òò³Í·£Ôö¼ÓÊ±µ÷ÓÃ
+    /// å½“æ¸¸æˆç»“æŸæ—¶è°ƒç”¨
     /// </summary>
-    /// <param name="penaltyAmount">³Í·£Ôö¼ÓµÄÑ¹Á¦Öµ</param>
+    private void OnGameOver()
+    {
+        StopFlashing(); // åœæ­¢æ­£å¸¸çš„å‹åŠ›é—ªçƒ
+
+        if (gameOverCoroutine != null)
+        {
+            StopCoroutine(gameOverCoroutine);
+        }
+        gameOverCoroutine = StartCoroutine(GameOverEffectCoroutine());
+    }
+
+    /// <summary>
+    /// æ¸¸æˆç»“æŸçš„é—ªçƒåˆ°å…¨çº¢åç¨‹
+    /// </summary>
+    private IEnumerator GameOverEffectCoroutine()
+    {
+        // 1. å¿«é€Ÿé—ªçƒå‡ æ¬¡ (æ¨¡æ‹Ÿå±å¹•è­¦å‘Š)
+        // æš‚å­˜å½“å‰çš„é—ªçƒå‚æ•°
+        float originalSpeed = currentFlashSpeed;
+        float originalMaxAlpha = currentMaxAlpha;
+
+        for (int i = 0; i < 3; i++) // é—ªçƒ3æ¬¡
+        {
+            // å¿«é€Ÿæ·¡å…¥
+            yield return StartCoroutine(FastFadeToAlpha(gameOverFlashAlpha, 0.5f / gameOverFlashSpeed));
+            // å¿«é€Ÿæ·¡å‡º
+            yield return StartCoroutine(FastFadeToAlpha(0f, 0.5f / gameOverFlashSpeed));
+        }
+
+        // 2. å®Œå…¨å˜çº¢ï¼ˆæ·¡å…¥åˆ°100%é€æ˜åº¦ï¼‰
+        yield return StartCoroutine(FastFadeToAlpha(1f, 0.5f)); // 0.5ç§’æ·¡å…¥åˆ°å®Œå…¨çº¢è‰²
+
+        // 3. ç»´æŒå®Œå…¨å˜çº¢ä¸€æ®µæ—¶é—´
+        if (flashImage != null)
+        {
+            Color color = flashImage.color;
+            color.a = 1f;
+            flashImage.color = color;
+        }
+
+        yield return new WaitForSeconds(gameOverSolidRedDuration);
+
+        // 4. é€šçŸ¥åœºæ™¯æ§åˆ¶å™¨å›åˆ°ä¸»èœå•
+        SceneController sceneController = FindObjectOfType<SceneController>();
+        if (sceneController != null)
+        {
+            sceneController.LoadStartMenuScene();
+        }
+        else
+        {
+            Debug.LogError("[StressFlashEffect] æœªæ‰¾åˆ° SceneController æ— æ³•åŠ è½½ä¸»èœå•ï¼");
+        }
+
+        // æ¢å¤åˆ°åŸå§‹é—ªçƒå‚æ•°
+        currentFlashSpeed = originalSpeed;
+        currentMaxAlpha = originalMaxAlpha;
+
+        gameOverCoroutine = null;
+    }
+
+    /// <summary>
+    /// å½“å‹åŠ›å› æƒ©ç½šå¢åŠ æ—¶è°ƒç”¨
+    /// </summary>
+    /// <param name="penaltyAmount">æƒ©ç½šå¢åŠ çš„å‹åŠ›å€¼</param>
     private void OnStressPenalty(float penaltyAmount)
     {
-        // ´¥·¢³Í·£ÉÁË¸Ğ§¹û
+        // è§¦å‘æƒ©ç½šé—ªçƒæ•ˆæœ
         if (penaltyFlashCoroutine != null)
         {
             StopCoroutine(penaltyFlashCoroutine);
@@ -91,29 +163,29 @@ public class StressFlashEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// ³Í·£ÉÁË¸Ğ­³Ì
+    /// æƒ©ç½šé—ªçƒåç¨‹
     /// </summary>
     private IEnumerator PenaltyFlashCoroutine()
     {
-        // ±£´æµ±Ç°Í¸Ã÷¶È
+        // ä¿å­˜å½“å‰é€æ˜åº¦
         float originalAlpha = flashImage != null ? flashImage.color.a : 0f;
 
         for (int i = 0; i < penaltyFlashCount; i++)
         {
-            // ¿ìËÙÉÁË¸µ½¸ßÍ¸Ã÷¶È
+            // å¿«é€Ÿé—ªçƒåˆ°é«˜é€æ˜åº¦
             yield return StartCoroutine(FastFadeToAlpha(penaltyFlashAlpha, penaltyFlashDuration * 0.3f));
 
-            // ¿ìËÙµ­³ö
+            // å¿«é€Ÿæ·¡å‡º
             yield return StartCoroutine(FastFadeToAlpha(0f, penaltyFlashDuration * 0.7f));
 
-            // Èç¹û²»ÊÇ×îºóÒ»´ÎÉÁË¸£¬ÉÔÎ¢µÈ´ıÒ»ÏÂ
+            // å¦‚æœä¸æ˜¯æœ€åä¸€æ¬¡é—ªçƒï¼Œç¨å¾®ç­‰å¾…ä¸€ä¸‹
             if (i < penaltyFlashCount - 1)
             {
                 yield return new WaitForSeconds(penaltyFlashDuration * 0.2f);
             }
         }
 
-        // »Ö¸´µ½Ô­Ê¼Í¸Ã÷¶È£¨Èç¹ûÕıÔÚÕı³£ÉÁË¸µÄ»°£©
+        // æ¢å¤åˆ°åŸå§‹é€æ˜åº¦ï¼ˆå¦‚æœæ­£åœ¨æ­£å¸¸é—ªçƒçš„è¯ï¼‰
         if (isFlashing && flashImage != null)
         {
             Color color = flashImage.color;
@@ -125,10 +197,10 @@ public class StressFlashEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// ¿ìËÙµ­»¯µ½Ö¸¶¨Í¸Ã÷¶È£¨ÓÃÓÚ³Í·£ÉÁË¸£©
+    /// å¿«é€Ÿæ·¡åŒ–åˆ°æŒ‡å®šé€æ˜åº¦ï¼ˆç”¨äºæƒ©ç½šå’Œæ¸¸æˆç»“æŸé—ªçƒï¼‰
     /// </summary>
-    /// <param name="targetAlpha">Ä¿±êÍ¸Ã÷¶È</param>
-    /// <param name="duration">³ÖĞøÊ±¼ä</param>
+    /// <param name="targetAlpha">ç›®æ ‡é€æ˜åº¦</param>
+    /// <param name="duration">æŒç»­æ—¶é—´</param>
     private IEnumerator FastFadeToAlpha(float targetAlpha, float duration)
     {
         if (flashImage == null) yield break;
@@ -151,9 +223,9 @@ public class StressFlashEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// ¿ªÊ¼ÉÁË¸Ğ§¹û
+    /// å¼€å§‹é—ªçƒæ•ˆæœ
     /// </summary>
-    /// <param name="stressLevel">µ±Ç°Ñ¹Á¦Öµ</param>
+    /// <param name="stressLevel">å½“å‰å‹åŠ›å€¼</param>
     public void StartFlashing(float stressLevel)
     {
         if (flashImage == null) return;
@@ -168,7 +240,7 @@ public class StressFlashEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// Í£Ö¹ÉÁË¸Ğ§¹û
+    /// åœæ­¢é—ªçƒæ•ˆæœ
     /// </summary>
     public void StopFlashing()
     {
@@ -179,43 +251,43 @@ public class StressFlashEffect : MonoBehaviour
             flashCoroutine = null;
         }
 
-        // µ­³öĞ§¹û£¨µ«²»Ó°ÏìÕıÔÚ½øĞĞµÄ³Í·£ÉÁË¸£©
-        if (flashImage != null && penaltyFlashCoroutine == null)
+        // æ·¡å‡ºæ•ˆæœï¼ˆä½†ä¸å½±å“æ­£åœ¨è¿›è¡Œçš„æƒ©ç½š/æ¸¸æˆç»“æŸé—ªçƒï¼‰
+        if (flashImage != null && penaltyFlashCoroutine == null && gameOverCoroutine == null)
             StartCoroutine(FadeOut());
     }
 
     /// <summary>
-    /// ¸ù¾İÑ¹Á¦Öµ¸üĞÂÉÁË¸Ç¿¶È
+    /// æ ¹æ®å‹åŠ›å€¼æ›´æ–°é—ªçƒå¼ºåº¦
     /// </summary>
-    /// <param name="stressLevel">µ±Ç°Ñ¹Á¦Öµ</param>
+    /// <param name="stressLevel">å½“å‰å‹åŠ›å€¼</param>
     private void UpdateFlashIntensity(float stressLevel)
     {
-        // ¼ÆËãÑ¹Á¦´Ó70%µ½100%µÄ½ø¶È (0-1)
+        // è®¡ç®—å‹åŠ›ä»70%åˆ°100%çš„è¿›åº¦ (0-1)
         float stressProgress = Mathf.Clamp01((stressLevel - stressThreshold) / (100f - stressThreshold));
 
-        // ¸ù¾İÑ¹Á¦½ø¶È²åÖµ¼ÆËãÉÁË¸²ÎÊı
+        // æ ¹æ®å‹åŠ›è¿›åº¦æ’å€¼è®¡ç®—é—ªçƒå‚æ•°
         currentFlashSpeed = Mathf.Lerp(minFlashSpeed, maxFlashSpeed, stressProgress);
         currentMaxAlpha = Mathf.Lerp(minAlpha, maxAlpha, stressProgress);
     }
 
     /// <summary>
-    /// ÉÁË¸Ğ­³Ì
+    /// é—ªçƒåç¨‹
     /// </summary>
     private IEnumerator FlashCoroutine()
     {
         while (isFlashing)
         {
-            // µ­Èë
+            // æ·¡å…¥
             yield return StartCoroutine(FadeToAlpha(currentMaxAlpha));
-            // µ­³ö
+            // æ·¡å‡º
             yield return StartCoroutine(FadeToAlpha(0f));
         }
     }
 
     /// <summary>
-    /// µ­»¯µ½Ö¸¶¨Í¸Ã÷¶È
+    /// æ·¡åŒ–åˆ°æŒ‡å®šé€æ˜åº¦
     /// </summary>
-    /// <param name="targetAlpha">Ä¿±êÍ¸Ã÷¶È</param>
+    /// <param name="targetAlpha">ç›®æ ‡é€æ˜åº¦</param>
     private IEnumerator FadeToAlpha(float targetAlpha)
     {
         if (flashImage == null) yield break;
@@ -239,7 +311,7 @@ public class StressFlashEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// µ­³öĞ§¹û
+    /// æ·¡å‡ºæ•ˆæœ
     /// </summary>
     private IEnumerator FadeOut()
     {
@@ -247,7 +319,7 @@ public class StressFlashEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// ÊÖ¶¯´¥·¢³Í·£ÉÁË¸£¨ÓÃÓÚ²âÊÔ»òÍâ²¿µ÷ÓÃ£©
+    /// æ‰‹åŠ¨è§¦å‘æƒ©ç½šé—ªçƒï¼ˆç”¨äºæµ‹è¯•æˆ–å¤–éƒ¨è°ƒç”¨ï¼‰
     /// </summary>
     public void TriggerPenaltyFlash()
     {
