@@ -115,6 +115,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
         [SerializeField] private bool _isLeader = false;
         [SerializeField] private float _penaltyCooldown = 3f;
         [SerializeField] private bool _enablePenaltyDebug = true;
+        [SerializeField] private ParticleSystem _penaltyParticleSystem; // 新增：用于播放惩罚特效
 
         [Header("Vision System")]
         [SerializeField] private bool _enableHeadTurn = true;
@@ -724,23 +725,48 @@ namespace Synty.AnimationBaseLocomotion.NPC
         /// <param name="playerCollider">玩家的碰撞体</param>
         private void CheckPlayerSlackingAndApplyPenalty(Collider playerCollider)
         {
-            if (!_isLeader || _isPlayerBlocked) return;
+            if (!_isLeader)
+            {
+                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ❌ 自身不是 Leader，跳过惩罚检查。");
+                return;
+            }
+            // 注意：ScanForPlayer在玩家被阻挡时不会调用此方法，但这里为调试目的保留检查
+            if (_isPlayerBlocked)
+            {
+                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] 🚧 玩家被阻挡，跳过惩罚检查。");
+                return;
+            }
 
             // 获取玩家的PlayerCharacterStatus组件
+            // 假设 CharacterStatus 是包含 isSlackingAtWork 和 ApplyPenalty() 的组件
             CharacterStatus characterStatus = playerCollider.GetComponent<CharacterStatus>();
             if (characterStatus != null && characterStatus.isSlackingAtWork)
             {
                 _isPlayerSlacking = true;
+                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ✅ 玩家正在摸鱼。准备检查冷却时间。");
 
                 // 检查惩罚冷却时间
                 if (Time.time - _lastPenaltyTime >= _penaltyCooldown)
                 {
-                    // 尝试对玩家进行惩罚
+                    if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ⏱️ 冷却时间已过。尝试对玩家施加惩罚...");
+
+                    // 尝试对玩家进行惩罚 (假设 ApplyPenalty() 返回 true 表示成功)
                     bool penaltyApplied = characterStatus.ApplyPenalty();
 
                     if (penaltyApplied)
                     {
                         _lastPenaltyTime = Time.time;
+
+                        // 💥 播放粒子特效
+                        if (_penaltyParticleSystem != null)
+                        {
+                            _penaltyParticleSystem.Play();
+                            if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] 🎉 惩罚成功！粒子特效已调用 Play()。");
+                        }
+                        else if (_enablePenaltyDebug)
+                        {
+                            Debug.Log($"[NPC Leader {gameObject.name}] ⚠️ 粒子系统引用缺失！无法播放特效。请在 Inspector 中设置。");
+                        }
 
                         if (_enablePenaltyDebug)
                         {
@@ -749,13 +775,25 @@ namespace Synty.AnimationBaseLocomotion.NPC
                     }
                     else if (_enablePenaltyDebug)
                     {
-                        Debug.Log($"[NPC Leader {gameObject.name}] ⚠️ 惩罚失败（可能工资不足或其他原因）");
+                        Debug.Log($"[NPC Leader {gameObject.name}] ⚠️ 惩罚失败 (ApplyPenalty() 返回 false)。可能工资不足或其他原因。");
                     }
                 }
                 else if (_enablePenaltyDebug)
                 {
                     float remainingCooldown = _penaltyCooldown - (Time.time - _lastPenaltyTime);
-                    Debug.Log($"[NPC Leader {gameObject.name}] 惩罚冷却中，剩余时间: {remainingCooldown:F1}秒");
+                    Debug.Log($"[NPC Leader {gameObject.name}] ⏳ 惩罚冷却中，剩余时间: {remainingCooldown:F2}秒。");
+                }
+            }
+            else
+            {
+                // 如果 NPC 是 Leader 且调试开启，但玩家不满足摸鱼条件
+                if (_isLeader && _enablePenaltyDebug)
+                {
+                    // 注意：这里的判断条件是 playerCollider.GetComponent<CharacterStatus>() != null
+                    if (characterStatus != null)
+                    {
+                        Debug.Log($"[NPC Leader {gameObject.name}] 🧐 玩家正常工作，状态：{characterStatus.isSlackingAtWork}");
+                    }
                 }
             }
         }
