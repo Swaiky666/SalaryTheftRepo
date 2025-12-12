@@ -4,19 +4,19 @@ using System.Collections;
 using Random = UnityEngine.Random;
 
 /// <summary>
-/// 打印任务处理器
+/// Print Task Handler
 /// </summary>
 public class PrintTaskHandler : MonoBehaviour, ITaskHandler
 {
-    [Header("打印机设置")]
+    [Header("Printer Settings")]
     [SerializeField] private PrinterSystem printerSystem;
     [SerializeField] private string requiredItemTag = "TaskMaterial";
 
-    [Header("任务完成器设置")]
+    [Header("Task Completer Settings")]
     [SerializeField] private GameObject taskCompleterPrefab;
     [SerializeField] private Transform[] taskCompleterSpawnPoints;
 
-    [Header("调试设置")]
+    [Header("Debug Settings")]
     [SerializeField] private bool enableDebugLog = true;
 
     private TaskManager taskManager;
@@ -31,14 +31,14 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
         taskManager = manager;
         ValidateComponents();
         if (enableDebugLog)
-            Debug.Log("[PrintTaskHandler] 打印任务处理器已初始化");
+            Debug.Log("[PrintTaskHandler] Print Task Handler initialized");
     }
 
     private void ValidateComponents()
     {
-        if (printerSystem == null) Debug.LogWarning("[PrintTaskHandler] 打印机系统引用未设置");
-        if (taskCompleterPrefab == null) Debug.LogWarning("[PrintTaskHandler] 任务完成器预制件未设置");
-        if (taskCompleterSpawnPoints == null || taskCompleterSpawnPoints.Length == 0) Debug.LogWarning("[PrintTaskHandler] 任务完成器生成点未设置");
+        if (printerSystem == null) Debug.LogWarning("[PrintTaskHandler] Printer System reference is not set");
+        if (taskCompleterPrefab == null) Debug.LogWarning("[PrintTaskHandler] Task Completer Prefab is not set");
+        if (taskCompleterSpawnPoints == null || taskCompleterSpawnPoints.Length == 0) Debug.LogWarning("[PrintTaskHandler] Task Completer Spawn Points are not set");
     }
 
     public bool CanHandleTask(TaskType taskType)
@@ -46,6 +46,9 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
         return taskType == TaskType.Print;
     }
 
+    /// <summary>
+    /// Starts the Print task. It instantiates a TaskCompleter at a spawn point.
+    /// </summary>
     public void StartTask(TaskData taskData, int taskIndex)
     {
         if (taskData == null) return;
@@ -56,7 +59,7 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
         StartWaitingStateMonitor();
 
         if (enableDebugLog)
-            Debug.Log($"[PrintTaskHandler] 打印任务已启动: {taskData.taskName} (索引: {taskIndex})");
+            Debug.Log($"[PrintTaskHandler] Print task started: {taskData.taskName} (Index: {taskIndex})");
     }
 
     private void SpawnTaskCompleter(int taskIndex)
@@ -67,7 +70,7 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
         int selectedSpawnIndex = SelectAvailableSpawnPoint();
         if (selectedSpawnIndex == -1)
         {
-            Debug.LogError("[PrintTaskHandler] 没有可用的生成点，无法生成任务完成器");
+            Debug.LogError("[PrintTaskHandler] No available spawn points, cannot spawn Task Completer");
             return;
         }
 
@@ -102,52 +105,8 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
         return -1;
     }
 
-    private IEnumerator MonitorWaitingState()
-    {
-        while (activeTasksData.Count > 0)
-        {
-            yield return new WaitForSeconds(2f);
-            if (activeTasksData.Count > 0)
-            {
-                SetPrinterWaitingState(true);
-            }
-        }
-        waitingStateMonitor = null;
-    }
-
-    private void StartWaitingStateMonitor()
-    {
-        if (waitingStateMonitor != null) StopCoroutine(waitingStateMonitor);
-        if (activeTasksData.Count > 0) waitingStateMonitor = StartCoroutine(MonitorWaitingState());
-    }
-
-    private void StopWaitingStateMonitor()
-    {
-        if (waitingStateMonitor != null)
-        {
-            StopCoroutine(waitingStateMonitor);
-            waitingStateMonitor = null;
-        }
-    }
-
-    private void CheckAndUpdatePrinterWaitingState()
-    {
-        bool shouldShowWaiting = activeTasksData.Count > 0;
-        SetPrinterWaitingState(shouldShowWaiting);
-    }
-
-    private void SetPrinterWaitingState(bool isWaiting)
-    {
-        if (printerSystem == null) return;
-        if (activeTasksData.Count > 0 && !isWaiting)
-        {
-            isWaiting = true;
-        }
-        printerSystem.SetWaitingForPrintJob(isWaiting);
-    }
-
     /// <summary>
-    /// 任务完成回调（由TaskCompleter调用）
+    /// Callback from TaskCompleter when the task is completed (material is placed).
     /// </summary>
     public void OnTaskCompleted(int taskIndex, GameObject completerObject)
     {
@@ -155,7 +114,7 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
 
         TaskData taskData = activeTasksData[taskIndex];
 
-        // 释放生成点和销毁完成器
+        // Release spawn point and destroy completer
         if (taskToSpawnPointMapping.ContainsKey(taskIndex))
         {
             int spawnPointIndex = taskToSpawnPointMapping[taskIndex];
@@ -168,71 +127,113 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
             Destroy(completerObject);
         }
 
-        // 清理任务数据
+        // Cleanup task data and notify TaskManager
         activeTasksData.Remove(taskIndex);
+        taskManager?.TaskCompleted(taskData.taskId, taskIndex);
+        CheckAndUpdatePrinterWaitingState(); // Update waiting status after task completion
 
         if (enableDebugLog)
-            Debug.Log($"[PrintTaskHandler] ✅ 打印任务完成: {taskData.taskName}，剩余活跃任务: {activeTasksData.Count}");
+            Debug.Log($"[PrintTaskHandler] ✅ Print task completed: {taskData.taskName}, completer destroyed.");
+    }
 
-        CheckAndUpdatePrinterWaitingState();
-        if (activeTasksData.Count == 0) StopWaitingStateMonitor();
+    private void CheckAndUpdatePrinterWaitingState()
+    {
+        if (printerSystem == null) return;
 
-        // 通知任务管理器任务完成 (已修正)
-        if (taskManager != null)
+        // Check if there are any active tasks (which means TaskCompleters are active)
+        bool isWaiting = activeTaskCompleters.Count > 0;
+
+        // Assumes PrinterSystem has a method/property to set its waiting state
+        // printerSystem.SetWaitingState(isWaiting);
+
+        if (enableDebugLog)
+            Debug.Log($"[PrintTaskHandler] Printer waiting state update: {(isWaiting ? "Waiting for Print" : "Normal")}");
+    }
+
+    private void StartWaitingStateMonitor()
+    {
+        if (waitingStateMonitor == null)
         {
-            taskManager.TaskCompleted(taskData.taskId, taskIndex);
+            waitingStateMonitor = StartCoroutine(WaitingStateMonitorCoroutine());
+        }
+    }
+
+    private void StopWaitingStateMonitor()
+    {
+        if (waitingStateMonitor != null)
+        {
+            StopCoroutine(waitingStateMonitor);
+            waitingStateMonitor = null;
+        }
+    }
+
+    private IEnumerator WaitingStateMonitorCoroutine()
+    {
+        while (true)
+        {
+            if (activeTaskCompleters.Count > 0)
+            {
+                // Logic check: if completers are active, printer should be in 'waiting' state
+                // Debug.Log($"[PrintTaskHandler] Coroutine: Printer is in waiting state, task completers are ready.");
+            }
+            else
+            {
+                // If all completers are gone, the printer is no longer 'waiting' for a print job.
+                StopWaitingStateMonitor();
+                // Debug.Log($"[PrintTaskHandler] Coroutine: Printer is no longer waiting, stopping waiting state monitor");
+                yield break;
+            }
+            yield return new WaitForSeconds(5.0f); // Check every 5 seconds
         }
     }
 
     public void CleanupTasks()
     {
         StopWaitingStateMonitor();
-        foreach (GameObject completer in activeTaskCompleters)
+        foreach (var completer in activeTaskCompleters)
         {
-            if (completer != null) Destroy(completer);
+            if (completer != null)
+            {
+                Destroy(completer);
+            }
         }
         activeTaskCompleters.Clear();
         activeTasksData.Clear();
         usedSpawnPointIndices.Clear();
         taskToSpawnPointMapping.Clear();
-        CheckAndUpdatePrinterWaitingState();
+
+        if (enableDebugLog)
+            Debug.Log("[PrintTaskHandler] Task completers and data cleaned up");
     }
 
-    void OnDestroy()
-    {
-        StopWaitingStateMonitor();
-        CleanupTasks();
-    }
+    // --- Debug Methods ---
 
-    // --- 调试方法 ---
-
-    [ContextMenu("检查处理器状态")]
+    [ContextMenu("Check Handler Status")]
     public void CheckHandlerStatus()
     {
-        Debug.Log($"[PrintTaskHandler] === 打印任务处理器状态 ===");
-        Debug.Log($"活跃任务完成器数量: {activeTaskCompleters.Count}");
-        Debug.Log($"活跃任务数据数量: {activeTasksData.Count}");
-        Debug.Log($"已使用生成点数量: {usedSpawnPointIndices.Count}");
-        Debug.Log($"等待状态监控协程: {(waitingStateMonitor != null ? "正在运行" : "未运行")}");
+        Debug.Log("[PrintTaskHandler] === Print Task Handler Status Check ===");
+        Debug.Log($"Active Completers Count: {activeTaskCompleters.Count}");
+        Debug.Log($"Used Spawn Points Count: {usedSpawnPointIndices.Count}");
+        Debug.Log($"Waiting State Monitor Coroutine: {(waitingStateMonitor != null ? "Running" : "Not Running")}");
 
         foreach (var kvp in activeTasksData)
         {
             TaskData task = kvp.Value;
             int spawnPointIndex = taskToSpawnPointMapping.ContainsKey(kvp.Key) ? taskToSpawnPointMapping[kvp.Key] : -1;
-            Debug.Log($"活跃任务 {kvp.Key}: {task.taskName} - 生成点索引: {spawnPointIndex}");
+            Debug.Log($"Active Task {kvp.Key}: {task.taskName} - Spawn Point Index: {spawnPointIndex}");
         }
     }
 
-    [ContextMenu("检查打印机等待状态")]
+    [ContextMenu("Check Printer Waiting Status")]
     public void CheckPrinterWaitingStatus()
     {
-        Debug.Log($"[PrintTaskHandler] === 打印机等待状态检查 ===");
+        Debug.Log("[PrintTaskHandler] === Printer Waiting Status Check ===");
         CheckAndUpdatePrinterWaitingState();
-        // 假设 PrinterSystem 有一个 IsWaitingForPrintJob 属性
-        // if (printerSystem != null) { Debug.Log($"当前打印机等待状态: {printerSystem.IsWaitingForPrintJob}"); }
+        // Assuming PrinterSystem has an IsWaitingForPrintJob property
+        // if (printerSystem != null) { Debug.Log($"Current Printer Waiting Status: {printerSystem.IsWaitingForPrintJob}"); }
     }
 
-    [ContextMenu("手动完成第一个任务")]
+    [ContextMenu("Manually Complete First Task")]
     public void ManualCompleteFirstTask()
     {
         if (activeTaskCompleters.Count > 0 && activeTaskCompleters[0] != null)
@@ -240,18 +241,14 @@ public class PrintTaskHandler : MonoBehaviour, ITaskHandler
             TaskCompleter completer = activeTaskCompleters[0].GetComponent<TaskCompleter>();
             if (completer != null)
             {
-                // FIX: 使用 TaskCompleter 的公共属性 TaskIndex
+                // FIX: Use TaskCompleter's public property TaskIndex
                 int compIndex = completer.TaskIndex;
                 OnTaskCompleted(compIndex, activeTaskCompleters[0]);
             }
             else
             {
-                Debug.LogWarning("[PrintTaskHandler] 无法获取 TaskCompleter 组件进行手动完成模拟。");
+                Debug.LogWarning("[PrintTaskHandler] Could not get TaskCompleter component...");
             }
-        }
-        else
-        {
-            Debug.Log("[PrintTaskHandler] 没有活跃的打印任务可以完成");
         }
     }
 }

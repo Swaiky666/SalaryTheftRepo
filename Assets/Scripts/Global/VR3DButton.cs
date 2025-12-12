@@ -3,21 +3,21 @@ using UnityEngine.Events;
 using UnityEngine.XR.Interaction.Toolkit;
 
 /// <summary>
-/// 通用 3D VR 按钮控制器 (适用于 Cube/Mesh)
-/// 处理 XR Interaction Toolkit 的 Select/Hover 事件，并提供视觉、音频和触觉反馈。
+/// Generic 3D VR Button Controller (suitable for Cube/Mesh)
+/// Handles XR Interaction Toolkit Select/Hover events and provides visual, audio and haptic feedback.
 /// </summary>
 [RequireComponent(typeof(XRSimpleInteractable))]
 public class VR3DButton : MonoBehaviour
 {
-    [Header("核心功能")]
-    [Tooltip("按钮被成功选择（按下）时触发的事件")]
+    [Header("Core Functionality")]
+    [Tooltip("Event invoked when the button is successfully selected (pressed)")]
     public UnityEvent OnClicked = new UnityEvent();
 
-    [Header("XR 交互组件")]
+    [Header("XR Interaction Components")]
     [SerializeField] private XRSimpleInteractable buttonInteractable;
     [SerializeField] private Transform buttonTransform;
 
-    [Header("视觉反馈")]
+    [Header("Visual Feedback")]
     [SerializeField] private Vector3 pressedPositionOffset = new Vector3(0, -0.01f, 0);
     [SerializeField] private Color normalColor = Color.white;
     [SerializeField] private Color hoverColor = Color.yellow;
@@ -25,19 +25,19 @@ public class VR3DButton : MonoBehaviour
     [SerializeField] private Color disabledColor = Color.gray;
     [SerializeField] private Renderer buttonRenderer;
 
-    [Header("音频反馈")]
+    [Header("Audio Feedback")]
     [SerializeField] private AudioClip hoverSound;
     [SerializeField][Range(0f, 1f)] private float hoverVolume = 0.5f;
 
-    [Header("触觉反馈")]
+    [Header("Haptic Feedback")]
     [SerializeField] private float hapticIntensity = 0.5f;
     [SerializeField] private float hapticDuration = 0.1f;
 
-    // 私有变量
+    // Private variables
     private Vector3 originalPosition;
     private Material buttonMaterial;
     private bool isPressed = false;
-    private bool canInteract = true; // 借鉴 VRPrinterButton 的状态管理
+    private bool canInteract = true; // State management inspired by VRPrinterButton
 
     void Start()
     {
@@ -45,11 +45,11 @@ public class VR3DButton : MonoBehaviour
     }
 
     /// <summary>
-    /// 初始化按钮
+    /// Initialize the button
     /// </summary>
     private void InitializeButton()
     {
-        // 自动获取组件
+        // Auto fetch components
         if (buttonInteractable == null)
             buttonInteractable = GetComponent<XRSimpleInteractable>();
 
@@ -59,106 +59,106 @@ public class VR3DButton : MonoBehaviour
         if (buttonRenderer == null)
             buttonRenderer = GetComponent<Renderer>();
 
-        // 记录原始位置
+        // Record original position
         originalPosition = buttonTransform.localPosition;
 
-        // 设置按钮材质和初始颜色
+        // Set button material and initial color
         if (buttonRenderer != null)
         {
             buttonMaterial = buttonRenderer.material;
             SetButtonColor(normalColor);
-            Debug.Log($"[VR3DButton:{gameObject.name}] 材质已尝试初始化。");
+            Debug.Log($"[VR3DButton:{gameObject.name}] Material initialization attempted.");
         }
         else
         {
-            Debug.LogError($"[VR3DButton:{gameObject.name}] Renderer组件为空! 无法获取材质。");
+            Debug.LogError($"[VR3DButton:{gameObject.name}] Renderer component is null! Cannot get material.");
         }
 
-        // 绑定交互事件
+        // Bind interaction events
         if (buttonInteractable != null)
         {
             buttonInteractable.selectEntered.AddListener(OnButtonPressed);
             buttonInteractable.selectExited.AddListener(OnButtonReleased);
             buttonInteractable.hoverEntered.AddListener(OnButtonHover);
             buttonInteractable.hoverExited.AddListener(OnButtonHoverExit);
-            Debug.Log($"[VR3DButton:{gameObject.name}] 事件监听已绑定。");
+            Debug.Log($"[VR3DButton:{gameObject.name}] Event listeners bound.");
         }
         else
         {
-            Debug.LogError("[VR3DButton] 缺少 XRSimpleInteractable 组件！");
+            Debug.LogError("[VR3DButton] Missing XRSimpleInteractable component!");
         }
     }
 
     /// <summary>
-    /// 按钮被按下时调用 (无论是射线点击还是直接触摸)
+    /// Called when the button is pressed (ray click or direct touch)
     /// </summary>
     private void OnButtonPressed(SelectEnterEventArgs args)
     {
-        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonPressed 尝试触发。");
+        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonPressed attempted.");
 
         if (!canInteract)
         {
-            Debug.LogWarning($"[VR3DButton:{gameObject.name}] 按钮被禁用 (canInteract=false)，阻止操作。");
+            Debug.LogWarning($"[VR3DButton:{gameObject.name}] Button is disabled (canInteract=false), blocking action.");
             return;
         }
 
         if (isPressed)
         {
-            Debug.LogWarning($"[VR3DButton:{gameObject.name}] 按钮已在按下状态 (isPressed=true)，阻止操作。");
+            Debug.LogWarning($"[VR3DButton:{gameObject.name}] Button already in pressed state (isPressed=true), blocking action.");
             return;
         }
 
         isPressed = true;
-        Debug.Log($"[VR3DButton:{gameObject.name}] 成功进入按下状态，执行反馈。");
+        Debug.Log($"[VR3DButton:{gameObject.name}] Entered pressed state, executing feedback.");
 
-        // 视觉反馈：按下位置和颜色
+        // Visual feedback: pressed position and color
         SetButtonPressed(true);
         SetButtonColor(pressedColor);
 
-        // 触觉反馈
+        // Haptic feedback
         SendHapticFeedback(args.interactorObject);
     }
 
     /// <summary>
-    /// 按钮释放时调用
+    /// Called when the button is released
     /// </summary>
     private void OnButtonReleased(SelectExitEventArgs args)
     {
-        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonReleased 触发。");
+        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonReleased triggered.");
 
         if (!isPressed)
         {
-            Debug.LogWarning($"[VR3DButton:{gameObject.name}] 释放时isPressed为false，忽略。");
+            Debug.LogWarning($"[VR3DButton:{gameObject.name}] isPressed is false on release, ignoring.");
             return;
         }
 
         isPressed = false;
 
-        // 触发外部绑定的点击事件
+        // Invoke external click event
         OnClicked.Invoke();
-        Debug.Log($"[VR3DButton:{gameObject.name}] OnClicked 事件触发。");
+        Debug.Log($"[VR3DButton:{gameObject.name}] OnClicked event invoked.");
 
-        // 恢复按钮状态
+        // Restore button state
         SetButtonPressed(false);
         SetButtonColor(normalColor);
     }
 
     /// <summary>
-    /// VR 射线或触碰悬停进入
+    /// Hover enter by ray or touch
     /// </summary>
     private void OnButtonHover(HoverEnterEventArgs args)
     {
-        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonHover 触发。");
+        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonHover triggered.");
 
         if (!canInteract) return;
 
-        // 悬停时的颜色变化
+        // Hover color change
         if (!isPressed)
         {
             SetButtonColor(hoverColor);
         }
 
-        // 播放悬停音效
+        // Play hover sound
         if (AudioManager.Instance != null && hoverSound != null)
         {
             AudioManager.Instance.PlaySFX(hoverSound, hoverVolume);
@@ -166,32 +166,30 @@ public class VR3DButton : MonoBehaviour
     }
 
     /// <summary>
-    /// VR 射线或触碰悬停退出
+    /// Hover exit by ray or touch
     /// </summary>
     private void OnButtonHoverExit(HoverExitEventArgs args)
     {
-        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonHoverExit 触发。");
+        Debug.Log($"[VR3DButton:{gameObject.name}] OnButtonHoverExit triggered.");
 
         if (!canInteract) return;
 
-        // 恢复正常颜色
+        // Restore normal color
         if (!isPressed)
         {
             SetButtonColor(normalColor);
         }
     }
 
-    // ... [SetButtonPressed, SendHapticFeedback 等方法保持不变]
-
     /// <summary>
-    /// 设置按钮颜色 (包含材质检查)
+    /// Set button color (with material checks)
     /// </summary>
     private void SetButtonColor(Color color)
     {
         if (buttonMaterial != null)
         {
-            Debug.Log($"[VR3DButton:{gameObject.name}] 尝试设置颜色: {color}");
-            // 兼容 URP/HDRP 或 Standard Shader
+            Debug.Log($"[VR3DButton:{gameObject.name}] Attempting to set color: {color}");
+            // Compatible with URP/HDRP or Standard Shader
             if (buttonMaterial.HasProperty("_BaseColor"))
             {
                 buttonMaterial.SetColor("_BaseColor", color);
@@ -207,12 +205,12 @@ public class VR3DButton : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"[VR3DButton:{gameObject.name}] 材质为空 (buttonMaterial is null)! 无法设置颜色。");
+            Debug.LogError($"[VR3DButton:{gameObject.name}] Material is null (buttonMaterial is null)! Cannot set color.");
         }
     }
 
     /// <summary>
-    /// 设置按钮交互状态 (借鉴 VRPrinterButton 的状态管理)
+    /// Set button interactable state (inspired by VRPrinterButton state management)
     /// </summary>
     public void SetInteractable(bool canInteract)
     {
@@ -223,10 +221,10 @@ public class VR3DButton : MonoBehaviour
             buttonInteractable.enabled = canInteract;
         }
 
-        // 更新视觉状态
+        // Update visual state
         Color targetColor = canInteract ? normalColor : disabledColor;
         SetButtonColor(targetColor);
-        Debug.Log($"[VR3DButton:{gameObject.name}] 交互状态设置为: {canInteract}");
+        Debug.Log($"[VR3DButton:{gameObject.name}] Interactable state set to: {canInteract}");
     }
 
     private void SetButtonPressed(bool pressed)
@@ -255,7 +253,7 @@ public class VR3DButton : MonoBehaviour
 
     void OnDestroy()
     {
-        // 清理事件监听
+        // Cleanup event listeners
         if (buttonInteractable != null)
         {
             buttonInteractable.selectEntered.RemoveListener(OnButtonPressed);

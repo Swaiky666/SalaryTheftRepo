@@ -4,22 +4,22 @@ using System.Collections;
 using System;
 
 /// <summary>
-/// 清理任务处理器
+/// Clean Task Handler
 /// </summary>
 public class CleanTaskHandler : MonoBehaviour, ITaskHandler
 {
-    [Header("清理系统设置")]
+    [Header("Clean System Settings")]
     [SerializeField] private SimplifiedCleanSystem cleanSystem;
 
-    [Header("任务设置")]
+    [Header("Task Settings")]
     [SerializeField] private int rubbishToCleanForCompletion = 5;
     [SerializeField] private float workProgressPerRubbish = 2f;
 
-    [Header("可重复任务设置")]
+    [Header("Repeatable Task Settings")]
     [SerializeField] private bool allowContinuousProgress = true;
     [SerializeField] private float continuousProgressMultiplier = 0.5f;
 
-    [Header("调试设置")]
+    [Header("Debug Settings")]
     [SerializeField] private bool enableDebugLog = true;
 
     private TaskManager taskManager;
@@ -34,7 +34,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
         BindCleanSystemEvents();
 
         if (enableDebugLog)
-            Debug.Log("[CleanTaskHandler] 清理任务处理器已初始化");
+            Debug.Log("[CleanTaskHandler] Clean Task Handler initialized");
     }
 
     private void ValidateComponents()
@@ -100,72 +100,72 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
     private void OnRubbishCleanedCallback(int cleanedCount)
     {
         List<int> tasksToUpdate = new List<int>(activeTasksData.Keys);
+        bool uiUpdateNeeded = false;
+
         foreach (int taskIndex in tasksToUpdate)
         {
-            ProcessRubbishCleanedForTask(taskIndex, cleanedCount);
-        }
-    }
+            TaskData taskData = activeTasksData[taskIndex];
 
-    private void ProcessRubbishCleanedForTask(int taskIndex, int cleanedCount)
-    {
-        if (!activeTasksData.ContainsKey(taskIndex)) return;
+            if (taskData.taskType != TaskType.Clean) continue;
 
-        TaskData taskData = activeTasksData[taskIndex];
-        bool wasCompleted = taskCompletionStatus.ContainsKey(taskIndex) && taskCompletionStatus[taskIndex];
-
-        if (taskCleanProgress.ContainsKey(taskIndex))
-        {
-            taskCleanProgress[taskIndex] += cleanedCount;
-        }
-        else
-        {
-            taskCleanProgress[taskIndex] = cleanedCount;
-        }
-
-        float progressIncrease = 0f;
-
-        if (wasCompleted && allowContinuousProgress)
-        {
-            // 任务已完成，按持续进度计算
-            progressIncrease = workProgressPerRubbish * cleanedCount * continuousProgressMultiplier;
-        }
-        else if (!wasCompleted)
-        {
-            // 任务未完成，计算达到完成条件前的进度
-            int progressBefore = taskCleanProgress[taskIndex] - cleanedCount;
-            int effectiveCleaned = 0;
-            if (progressBefore < rubbishToCleanForCompletion)
+            if (taskCompletionStatus.ContainsKey(taskIndex) && taskCompletionStatus[taskIndex])
             {
-                effectiveCleaned = Mathf.Min(cleanedCount, rubbishToCleanForCompletion - progressBefore);
+                // Task is completed (for non-repeatable) or has been completed at least once (for repeatable)
+                if (taskData.isRepeatable && allowContinuousProgress)
+                {
+                    // For repeatable tasks, add progress directly after the first completion
+                    float continuousProgress = workProgressPerRubbish * continuousProgressMultiplier;
+                    taskManager?.AddWorkProgress(continuousProgress, taskData.taskName, true);
+                    if (enableDebugLog)
+                        Debug.Log($"[CleanTaskHandler] Continuous progress added for repeatable task {taskData.taskName}: +{continuousProgress:F2}%");
+                }
+                continue;
             }
-            progressIncrease = workProgressPerRubbish * effectiveCleaned;
+
+            // Task is not completed (or is a repeatable task being completed for the first time)
+            if (taskCleanProgress.ContainsKey(taskIndex))
+            {
+                taskCleanProgress[taskIndex] = cleanedCount;
+
+                if (cleanedCount >= rubbishToCleanForCompletion)
+                {
+                    CompleteTask(taskIndex);
+                    uiUpdateNeeded = true;
+                }
+                else
+                {
+                    uiUpdateNeeded = true;
+                }
+            }
         }
 
-        if (progressIncrease > 0)
+        if (uiUpdateNeeded)
         {
-            taskManager?.AddWorkProgress(progressIncrease, taskData.taskName, wasCompleted);
+            taskManager?.UpdateTaskUI();
         }
-
-        if (!wasCompleted && taskCleanProgress[taskIndex] >= rubbishToCleanForCompletion)
-        {
-            CompleteTask(taskIndex);
-        }
-
-        taskManager?.UpdateTaskUI();
     }
 
     private void CompleteTask(int taskIndex)
     {
-        if (!activeTasksData.ContainsKey(taskIndex)) return;
+        if (activeTasksData.ContainsKey(taskIndex) && !taskCompletionStatus[taskIndex])
+        {
+            TaskData taskData = activeTasksData[taskIndex];
 
-        TaskData taskData = activeTasksData[taskIndex];
+            // Only mark as completed and notify the manager if it's the first time
+            if (!taskData.isCompleted || taskData.isRepeatable)
+            {
+                taskCompletionStatus[taskIndex] = true;
+                taskManager?.TaskCompleted(taskData.taskId, taskIndex);
 
-        taskCompletionStatus[taskIndex] = true;
+                // Add work progress for the final completion
+                // This is a rough way to ensure progress is added if the progress was not added incrementally
+                float remainingProgress = (rubbishToCleanForCompletion - (taskCleanProgress.ContainsKey(taskIndex) ? taskCleanProgress[taskIndex] : 0) + 1) * workProgressPerRubbish;
+                taskManager?.AddWorkProgress(remainingProgress, taskData.taskName, false);
 
-        if (enableDebugLog)
-            Debug.Log($"[CleanTaskHandler] ✅ 清理任务 {taskData.taskName} (索引: {taskIndex}) 已完成!");
-
-        taskManager?.TaskCompleted(taskData.taskId, taskIndex);
+                if (enableDebugLog)
+                    Debug.Log($"[CleanTaskHandler] ✅ Clean task {taskData.taskName} completed. Notifying TaskManager.");
+            }
+        }
     }
 
     public void CleanupTasks()
@@ -173,13 +173,11 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
         activeTasksData.Clear();
         taskCleanProgress.Clear();
         taskCompletionStatus.Clear();
-
-        if (enableDebugLog)
-            Debug.Log("[CleanTaskHandler] 任务数据已清理");
+        UnbindCleanSystemEvents();
+        if (enableDebugLog) Debug.Log("[CleanTaskHandler] Task data cleaned up");
     }
 
-    // --- 数据访问器 ---
-
+    // --- Data Accessors ---
     public int GetTaskCleanProgress(int taskIndex)
     {
         return taskCleanProgress.ContainsKey(taskIndex) ? taskCleanProgress[taskIndex] : 0;
@@ -188,9 +186,9 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
     public int RubbishToCleanForCompletion => rubbishToCleanForCompletion;
     public float WorkProgressPerRubbish => workProgressPerRubbish;
 
-    // --- 调试方法 ---
+    // --- Debug Methods ---
 
-    [ContextMenu("设置第一个清理任务进度为完成")]
+    [ContextMenu("Set First Clean Task Progress to Complete")]
     public void SetFirstTaskProgressToComplete()
     {
         foreach (var kvp in activeTasksData)
@@ -201,7 +199,7 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
                 return;
             }
         }
-        Debug.LogWarning("[CleanTaskHandler] 没有活跃的清理任务可供调试");
+        Debug.LogWarning("[CleanTaskHandler] No active clean tasks available for debug");
     }
 
     public void ForceCompleteTask(int taskIndex)
@@ -221,12 +219,11 @@ public class CleanTaskHandler : MonoBehaviour, ITaskHandler
 
         taskManager?.UpdateTaskUI();
         if (enableDebugLog)
-            Debug.Log($"[CleanTaskHandler Debug] 任务 {activeTasksData[taskIndex].taskName} 进度强制设置为 {rubbishToCleanForCompletion}，并尝试完成");
+            Debug.Log($"[CleanTaskHandler Debug] Task {activeTasksData[taskIndex].taskName} progress forcefully set to {rubbishToCleanForCompletion}, attempting completion.");
     }
 
     void OnDestroy()
     {
         UnbindCleanSystemEvents();
-        CleanupTasks();
     }
 }

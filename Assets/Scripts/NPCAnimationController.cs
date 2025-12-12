@@ -115,7 +115,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
         [SerializeField] private bool _isLeader = false;
         [SerializeField] private float _penaltyCooldown = 3f;
         [SerializeField] private bool _enablePenaltyDebug = true;
-        [SerializeField] private ParticleSystem _penaltyParticleSystem; // 新增：用于播放惩罚特效
+        [SerializeField] private ParticleSystem _penaltyParticleSystem; // Added: used to play penalty particle effect
 
         [Header("Vision System")]
         [SerializeField] private bool _enableHeadTurn = true;
@@ -316,27 +316,27 @@ namespace Synty.AnimationBaseLocomotion.NPC
 
         private void OnDrawGizmosSelected()
         {
-            // 障碍物检测可视化
+            // Obstacle detection visualization
             Gizmos.color = _hasObstacleAhead ? Color.red : Color.green;
             Vector3 leftBoundary = Quaternion.AngleAxis(-_obstacleDetectionAngle / 2f, Vector3.up) * transform.forward * _obstacleDetectionDistance;
             Vector3 rightBoundary = Quaternion.AngleAxis(_obstacleDetectionAngle / 2f, Vector3.up) * transform.forward * _obstacleDetectionDistance;
             Gizmos.DrawRay(transform.position, leftBoundary);
             Gizmos.DrawRay(transform.position, rightBoundary);
 
-            // 玩家检测可视化
+            // Player detection visualization
             if (_hasPlayerInSight)
             {
                 if (_isPlayerSlacking && _isLeader)
                 {
-                    Gizmos.color = Color.red; // 领导发现玩家摸鱼
+                    Gizmos.color = Color.red; // Leader spotted player slacking
                 }
                 else if (_isPlayerBlocked)
                 {
-                    Gizmos.color = Color.yellow; // 玩家被阻挡
+                    Gizmos.color = Color.yellow; // Player is blocked
                 }
                 else
                 {
-                    Gizmos.color = Color.blue; // 正常检测到玩家
+                    Gizmos.color = Color.blue; // Player detected normally
                 }
             }
             else
@@ -350,11 +350,11 @@ namespace Synty.AnimationBaseLocomotion.NPC
             Gizmos.DrawRay(transform.position, leftPlayerBoundary);
             Gizmos.DrawRay(transform.position, rightPlayerBoundary);
 
-            // 检测范围球体
+            // Detection range sphere
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(transform.position, _playerDetectionDistance);
 
-            // 如果检测到玩家，绘制到玩家的连线
+            // If player is detected, draw a line to the player
             if (_detectedPlayer != null)
             {
                 if (_isPlayerSlacking && _isLeader)
@@ -372,7 +372,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
                 Gizmos.DrawLine(transform.position + Vector3.up * 1.7f, _detectedPlayer.position + Vector3.up * 1f);
             }
 
-            // 路径点可视化
+            // Waypoints visualization
             if (_waypoints != null && _waypoints.Length > 1)
             {
                 Gizmos.color = Color.cyan;
@@ -390,41 +390,41 @@ namespace Synty.AnimationBaseLocomotion.NPC
                 }
             }
 
-            // 特殊点可视化
+            // Special points visualization
             if (_specialPoints != null && _specialPoints.Length > 0)
             {
                 for (int i = 0; i < _specialPoints.Length; i++)
                 {
                     if (_specialPoints[i] != null)
                     {
-                        // 特殊点本身 - 橙色
+                        // Special point itself - magenta
                         Gizmos.color = Color.magenta;
                         Gizmos.DrawWireSphere(_specialPoints[i].position, 0.8f);
                         Gizmos.DrawCube(_specialPoints[i].position + Vector3.up * 0.5f, Vector3.one * 0.3f);
 
-                        // 检测范围 - 半透明橙色
+                        // Detection range - semi-transparent orange
                         Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
                         Gizmos.DrawSphere(_specialPoints[i].position, _specialPointDetectionRange);
 
-                        // 检测范围边界 - 橙色线框
+                        // Detection range boundary - red wireframe
                         Gizmos.color = Color.red;
                         Gizmos.DrawWireSphere(_specialPoints[i].position, _specialPointDetectionRange);
 
-                        // 到达范围 - 红色
+                        // Reach range - red
                         Gizmos.color = Color.red;
                         Gizmos.DrawWireSphere(_specialPoints[i].position, _specialPointReachDistance);
                     }
                 }
             }
 
-            // 当前特殊点连线
+            // Line to current special point
             if (_currentSpecialPoint != null)
             {
                 Gizmos.color = Color.magenta;
                 Gizmos.DrawLine(transform.position, _currentSpecialPoint.position);
             }
 
-            // 返回位置标记
+            // Return position marker
             if (_isGoingToSpecialPoint || _isAtSpecialPoint)
             {
                 Gizmos.color = Color.green;
@@ -432,7 +432,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
                 Gizmos.DrawLine(transform.position, _returnPosition);
             }
 
-            // 领导标识
+            // Leader marker
             if (_isLeader)
             {
                 Gizmos.color = Color.yellow;
@@ -446,7 +446,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
 
         private void UpdateVisionSystem()
         {
-            // 如果在特殊点等待，不进行任何扫视或转头，保持idle状态
+            // If waiting at a special point, do not scan or turn head; remain idle
             if (_isAtSpecialPoint)
             {
                 _targetHeadAngle = 0f;
@@ -655,12 +655,12 @@ namespace Synty.AnimationBaseLocomotion.NPC
                         {
                             if (hit.collider.CompareTag(_playerTag))
                             {
-                                // 玩家没有被阻挡
+                                // Player is not blocked
                                 _hasPlayerInSight = true;
                                 _detectedPlayer = collider.transform;
                                 _isPlayerBlocked = false;
 
-                                // 检查玩家是否在摸鱼并处理惩罚（仅领导可以）
+                                // Check if player is slacking and apply penalty (leaders only)
                                 CheckPlayerSlackingAndApplyPenalty(collider);
 
                                 if (!_isPlayerLocked)
@@ -675,7 +675,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
                             {
                                 if (IsBlockingObject(hit.collider))
                                 {
-                                    // 玩家被阻挡，不能进行惩罚
+                                    // Player is blocked, cannot apply penalty
                                     _hasPlayerInSight = true;
                                     _detectedPlayer = collider.transform;
                                     _isPlayerBlocked = true;
@@ -693,12 +693,12 @@ namespace Synty.AnimationBaseLocomotion.NPC
                         }
                         else
                         {
-                            // 玩家没有被阻挡
+                            // Player is not blocked (no hit)
                             _hasPlayerInSight = true;
                             _detectedPlayer = collider.transform;
                             _isPlayerBlocked = false;
 
-                            // 检查玩家是否在摸鱼并处理惩罚（仅领导可以）
+                            // Check if player is slacking and apply penalty (leaders only)
                             CheckPlayerSlackingAndApplyPenalty(collider);
 
                             if (!_isPlayerLocked)
@@ -720,97 +720,97 @@ namespace Synty.AnimationBaseLocomotion.NPC
         }
 
         /// <summary>
-        /// 检查玩家是否在摸鱼并应用惩罚（仅限领导）
+        /// Check if the player is slacking and apply a penalty (leaders only)
         /// </summary>
-        /// <param name="playerCollider">玩家的碰撞体</param>
+        /// <param name="playerCollider">Player's collider</param>
         private void CheckPlayerSlackingAndApplyPenalty(Collider playerCollider)
         {
             if (!_isLeader)
             {
-                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ❌ 自身不是 Leader，跳过惩罚检查。");
+                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ❌ Not a leader, skipping penalty check.");
                 return;
             }
-            // 注意：ScanForPlayer在玩家被阻挡时不会调用此方法，但这里为调试目的保留检查
+            // Note: ScanForPlayer will not call this when the player is blocked, but the check is retained here for debugging purposes
             if (_isPlayerBlocked)
             {
-                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] 🚧 玩家被阻挡，跳过惩罚检查。");
+                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] 🚧 Player is blocked, skipping penalty check.");
                 return;
             }
 
-            // 获取玩家的PlayerCharacterStatus组件
-            // 假设 CharacterStatus 是包含 isSlackingAtWork 和 ApplyPenalty() 的组件
+            // Get the player's CharacterStatus component
+            // Assume CharacterStatus contains isSlackingAtWork and ApplyPenalty()
             CharacterStatus characterStatus = playerCollider.GetComponent<CharacterStatus>();
             if (characterStatus != null && characterStatus.isSlackingAtWork)
             {
                 _isPlayerSlacking = true;
-                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ✅ 玩家正在摸鱼。准备检查冷却时间。");
+                if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ✅ Player is slacking. Preparing cooldown check.");
 
-                // 检查惩罚冷却时间
+                // Check penalty cooldown
                 if (Time.time - _lastPenaltyTime >= _penaltyCooldown)
                 {
-                    if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ⏱️ 冷却时间已过。尝试对玩家施加惩罚...");
+                    if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] ⏱️ Cooldown expired. Attempting to apply penalty to player...");
 
-                    // 尝试对玩家进行惩罚 (假设 ApplyPenalty() 返回 true 表示成功)
+                    // Try to apply penalty to the player (assume ApplyPenalty() returns true on success)
                     bool penaltyApplied = characterStatus.ApplyPenalty();
 
                     if (penaltyApplied)
                     {
                         _lastPenaltyTime = Time.time;
 
-                        // 💥 播放粒子特效
+                        // Play particle effect
                         if (_penaltyParticleSystem != null)
                         {
                             _penaltyParticleSystem.Play();
-                            if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] 🎉 惩罚成功！粒子特效已调用 Play()。");
+                            if (_enablePenaltyDebug) Debug.Log($"[NPC Leader {gameObject.name}] 🎉 Penalty applied! Particle effect Play() called.");
                         }
                         else if (_enablePenaltyDebug)
                         {
-                            Debug.Log($"[NPC Leader {gameObject.name}] ⚠️ 粒子系统引用缺失！无法播放特效。请在 Inspector 中设置。");
+                            Debug.Log($"[NPC Leader {gameObject.name}] ⚠️ ParticleSystem reference missing! Cannot play effect. Please assign it in the Inspector.");
                         }
 
                         if (_enablePenaltyDebug)
                         {
-                            Debug.Log($"[NPC Leader {gameObject.name}] 🚨 发现玩家摸鱼！已扣工资！");
+                            Debug.Log($"[NPC Leader {gameObject.name}] 🚨 Player slacking detected! Penalty applied.");
                         }
                     }
                     else if (_enablePenaltyDebug)
                     {
-                        Debug.Log($"[NPC Leader {gameObject.name}] ⚠️ 惩罚失败 (ApplyPenalty() 返回 false)。可能工资不足或其他原因。");
+                        Debug.Log($"[NPC Leader {gameObject.name}] ⚠️ Penalty failed (ApplyPenalty() returned false). Possibly insufficient funds or other reason.");
                     }
                 }
                 else if (_enablePenaltyDebug)
                 {
                     float remainingCooldown = _penaltyCooldown - (Time.time - _lastPenaltyTime);
-                    Debug.Log($"[NPC Leader {gameObject.name}] ⏳ 惩罚冷却中，剩余时间: {remainingCooldown:F2}秒。");
+                    Debug.Log($"[NPC Leader {gameObject.name}] ⏳ Penalty on cooldown, remaining time: {remainingCooldown:F2}s.");
                 }
             }
             else
             {
-                // 如果 NPC 是 Leader 且调试开启，但玩家不满足摸鱼条件
+                // If NPC is leader and debug enabled, but player is not slacking
                 if (_isLeader && _enablePenaltyDebug)
                 {
-                    // 注意：这里的判断条件是 playerCollider.GetComponent<CharacterStatus>() != null
+                    // Note: the condition here checks that playerCollider.GetComponent<CharacterStatus>() != null
                     if (characterStatus != null)
                     {
-                        Debug.Log($"[NPC Leader {gameObject.name}] 🧐 玩家正常工作，状态：{characterStatus.isSlackingAtWork}");
+                        Debug.Log($"[NPC Leader {gameObject.name}] 🧐 Player working normally, isSlackingAtWork: {characterStatus.isSlackingAtWork}");
                     }
                 }
             }
         }
 
         /// <summary>
-        /// 检查是否可以应用惩罚
+        /// Check whether a penalty can be applied
         /// </summary>
-        /// <returns>是否可以惩罚</returns>
+        /// <returns>Whether penalty can be applied</returns>
         public bool CanApplyPenalty()
         {
             return _isLeader && Time.time - _lastPenaltyTime >= _penaltyCooldown;
         }
 
         /// <summary>
-        /// 获取惩罚剩余冷却时间
+        /// Get remaining penalty cooldown time
         /// </summary>
-        /// <returns>剩余冷却时间（秒）</returns>
+        /// <returns>Remaining cooldown time (seconds)</returns>
         public float GetPenaltyRemainingCooldown()
         {
             if (!_isLeader) return 0f;
@@ -819,14 +819,14 @@ namespace Synty.AnimationBaseLocomotion.NPC
         }
 
         /// <summary>
-        /// 重置惩罚冷却时间（用于调试）
+        /// Reset penalty cooldown (for debugging)
         /// </summary>
         public void ResetPenaltyCooldown()
         {
             _lastPenaltyTime = -999f;
             if (_enablePenaltyDebug)
             {
-                Debug.Log($"[NPC Leader {gameObject.name}] 惩罚冷却时间已重置");
+                Debug.Log($"[NPC Leader {gameObject.name}] Penalty cooldown reset");
             }
         }
 
@@ -845,14 +845,14 @@ namespace Synty.AnimationBaseLocomotion.NPC
             if (!_enableSpecialPoints || _specialPoints == null || _specialPoints.Length == 0)
                 return;
 
-            // 更新冷却时间
+            // Update cooldown
             if (_specialPointCooldownRemaining > 0f)
             {
                 _specialPointCooldownRemaining -= Time.deltaTime;
                 _specialPointCooldownRemaining = Mathf.Max(0f, _specialPointCooldownRemaining);
             }
 
-            // 如果已经在特殊点，更新停留计时器
+            // If currently at a special point, update stay timer
             if (_isAtSpecialPoint && _currentSpecialPoint != null)
             {
                 _specialPointTimer += Time.deltaTime;
@@ -863,17 +863,17 @@ namespace Synty.AnimationBaseLocomotion.NPC
             }
         }
 
-        // 检查是否有特殊点在检测范围内
+        // Check for special points within detection range
         public Transform GetNearbySpecialPoint()
         {
             if (!_enableSpecialPoints || _specialPoints == null || _specialPoints.Length == 0)
                 return null;
 
-            // 如果已经在处理特殊点，不检查新的
+            // If already handling a special point, don't check new ones
             if (_isGoingToSpecialPoint || _isAtSpecialPoint)
                 return null;
 
-            // 检查冷却时间
+            // Check cooldown
             if (_specialPointCooldownRemaining > 0f)
             {
                 return null;
@@ -886,24 +886,24 @@ namespace Synty.AnimationBaseLocomotion.NPC
                 float distance = Vector3.Distance(transform.position, specialPoint.position);
                 if (distance <= _specialPointDetectionRange)
                 {
-                    // 开始冷却时间（无论概率判定结果如何）
+                    // Start cooldown (regardless of chance result)
                     _specialPointCooldownRemaining = _specialPointCooldownTime;
                     _lastSpecialPointCheckTime = Time.time;
 
-                    // 检查概率
+                    // Chance roll
                     float randomValue = Random.Range(0f, 1f);
-                    Debug.Log($"NPC {gameObject.name}: 特殊点 {specialPoint.name} 概率判定: {randomValue:F2} <= {_specialPointActivationChance:F2}？");
+                    Debug.Log($"NPC {gameObject.name}: Special point {specialPoint.name} chance roll: {randomValue:F2} <= {_specialPointActivationChance:F2}?");
 
                     if (randomValue <= _specialPointActivationChance)
                     {
-                        Debug.Log($"NPC {gameObject.name}: 概率判定成功！前往特殊点 {specialPoint.name}");
+                        Debug.Log($"NPC {gameObject.name}: Chance succeeded! Heading to special point {specialPoint.name}");
                         return specialPoint;
                     }
                     else
                     {
-                        Debug.Log($"NPC {gameObject.name}: 概率判定失败，冷却时间 {_specialPointCooldownTime} 秒");
-                        // 即使概率判定失败，也要开始冷却时间
-                        break; // 跳出循环，避免检查其他特殊点
+                        Debug.Log($"NPC {gameObject.name}: Chance failed, starting cooldown {_specialPointCooldownTime} seconds");
+                        // Even if chance fails, start cooldown
+                        break; // Break to avoid checking other special points immediately
                     }
                 }
             }
@@ -911,7 +911,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
             return null;
         }
 
-        // 开始前往特殊点
+        // Start going to a special point
         public void StartGoingToSpecialPoint(Transform specialPoint)
         {
             if (specialPoint == null) return;
@@ -920,7 +920,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
             _isAtSpecialPoint = false;
             _currentSpecialPoint = specialPoint;
 
-            // 记录返回位置
+            // Record return position
             if (_isFollowingPath && _waypoints != null && _currentWaypointIndex < _waypoints.Length)
             {
                 _returnPosition = _waypoints[_currentWaypointIndex].position;
@@ -932,10 +932,10 @@ namespace Synty.AnimationBaseLocomotion.NPC
                 _returnWaypointIndex = _currentWaypointIndex;
             }
 
-            Debug.Log($"NPC {gameObject.name}: 开始前往特殊点 {specialPoint.name}");
+            Debug.Log($"NPC {gameObject.name}: Starting to go to special point {specialPoint.name}");
         }
 
-        // 到达特殊点
+        // Reach special point
         public void ReachSpecialPoint()
         {
             if (!_isGoingToSpecialPoint || _currentSpecialPoint == null) return;
@@ -944,13 +944,13 @@ namespace Synty.AnimationBaseLocomotion.NPC
             _isAtSpecialPoint = true;
             _specialPointTimer = 0f;
 
-            // 标记为已访问
+            // Mark visited
             _visitedSpecialPoints.Add(_currentSpecialPoint);
 
-            Debug.Log($"NPC {gameObject.name}: 到达特殊点 {_currentSpecialPoint.name}，开始停留 {_specialPointStayTime} 秒");
+            Debug.Log($"NPC {gameObject.name}: Reached special point {_currentSpecialPoint.name}, starting to stay for {_specialPointStayTime} seconds");
         }
 
-        // 开始从特殊点返回
+        // Start returning from special point
         public void StartReturnFromSpecialPoint()
         {
             if (!_isAtSpecialPoint) return;
@@ -958,12 +958,12 @@ namespace Synty.AnimationBaseLocomotion.NPC
             _isAtSpecialPoint = false;
             _isGoingToSpecialPoint = false;
 
-            Debug.Log($"NPC {gameObject.name}: 从特殊点 {_currentSpecialPoint.name} 返回到路径");
+            Debug.Log($"NPC {gameObject.name}: Returning from special point {_currentSpecialPoint.name} to path");
 
             _currentSpecialPoint = null;
             _specialPointTimer = 0f;
 
-            // 恢复路径跟随
+            // Resume path following
             if (_enablePathFollowing && _waypoints != null && _waypoints.Length > 0)
             {
                 _currentWaypointIndex = _returnWaypointIndex;
@@ -971,14 +971,14 @@ namespace Synty.AnimationBaseLocomotion.NPC
             }
         }
 
-        // 检查是否到达特殊点
+        // Check if near special point
         public bool IsNearSpecialPoint(Transform specialPoint)
         {
             if (specialPoint == null) return false;
             return Vector3.Distance(transform.position, specialPoint.position) <= _specialPointReachDistance;
         }
 
-        // 检查是否到达返回位置
+        // Check if near return position
         public bool IsNearReturnPosition()
         {
             return Vector3.Distance(transform.position, _returnPosition) <= _waypointReachDistance;
@@ -1579,44 +1579,44 @@ namespace Synty.AnimationBaseLocomotion.NPC
         private void BuildBehaviorTree()
         {
             rootNode = new SelectorNode(
-                // 最高优先级：避开障碍物
+                // Highest priority: avoid obstacles
                 new SequenceNode(
                     new ConditionNode(() => npc.HasObstacleAhead),
                     new ActionNode(AvoidObstacle)
                 ),
 
-                // 第二优先级：前往特殊点
+                // Second priority: go to special points
                 new SequenceNode(
                     new ConditionNode(() => npc.EnableSpecialPoints && !npc.IsGoingToSpecialPoint && !npc.IsAtSpecialPoint),
                     new ActionNode(CheckForSpecialPoints)
                 ),
 
-                // 第三优先级：特殊点行为
+                // Third priority: special point navigation
                 new SequenceNode(
                     new ConditionNode(() => npc.IsGoingToSpecialPoint),
                     new ActionNode(GoToSpecialPoint)
                 ),
 
-                // 第四优先级：在特殊点停留
+                // Fourth priority: stay at special point
                 new SequenceNode(
                     new ConditionNode(() => npc.IsAtSpecialPoint),
                     new ActionNode(StayAtSpecialPoint)
                 ),
 
-                // 第五优先级：跟随路径
+                // Fifth priority: follow path
                 new SequenceNode(
                     new ConditionNode(() => npc.EnablePathFollowing && npc.Waypoints != null && npc.Waypoints.Length > 0),
                     new ActionNode(FollowPath)
                 ),
 
-                // 第六优先级：静止扫描
+                // Sixth priority: stationary scanning
                 new SequenceNode(
                     new ConditionNode(() => !npc.IsMoving &&
                                            (!npc.EnablePathFollowing || npc.Waypoints == null || npc.Waypoints.Length == 0)),
                     new ActionNode(StationaryScanning)
                 ),
 
-                // 最低优先级：巡逻行为
+                // Lowest priority: patrol behavior
                 new ActionNode(PatrolBehavior)
             );
         }
@@ -1644,14 +1644,14 @@ namespace Synty.AnimationBaseLocomotion.NPC
                 return BehaviorNode.NodeState.Failure;
             }
 
-            // 检查是否到达特殊点
+            // Check if reached the special point
             if (npc.IsNearSpecialPoint(npc.CurrentSpecialPoint))
             {
                 npc.ReachSpecialPoint();
                 return BehaviorNode.NodeState.Success;
             }
 
-            // 继续前往特殊点
+            // Continue moving toward special point
             npc.MoveTowards(npc.CurrentSpecialPoint.position);
             npc.SetGaitState(NPCAnimationController.NPCGaitState.Walk);
             return BehaviorNode.NodeState.Running;
@@ -1659,7 +1659,7 @@ namespace Synty.AnimationBaseLocomotion.NPC
 
         private BehaviorNode.NodeState StayAtSpecialPoint()
         {
-            // 在特殊点停留，什么都不做
+            // Stay at the special point, do nothing
             npc.StopMovement();
             return BehaviorNode.NodeState.Running;
         }

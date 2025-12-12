@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 优先级队列节点
+/// Priority Queue Node
 /// </summary>
 public struct PriorityQueueNode<T>
 {
@@ -90,57 +90,77 @@ public class PriorityQueue<T>
         int index = itemToIndexMap[item];
         float oldPriority = heap[index].Priority;
 
+        if (Math.Abs(oldPriority - newPriority) < 0.0001f) return; // Ignore minimal change
+
         heap[index] = new PriorityQueueNode<T>(item, newPriority);
 
         if (newPriority < oldPriority)
         {
             HeapifyUp(index);
         }
-        else if (newPriority > oldPriority)
+        else
         {
             HeapifyDown(index);
         }
     }
 
     /// <summary>
-    /// Remove a specific item from the queue (Time Complexity: O(log n))
+    /// Remove an item from the queue (Time Complexity: O(log n))
     /// </summary>
-    public void Remove(T item)
+    public bool Remove(T item)
     {
-        if (!itemToIndexMap.ContainsKey(item)) return;
+        if (!itemToIndexMap.ContainsKey(item))
+        {
+            return false;
+        }
 
         int index = itemToIndexMap[item];
         RemoveAt(index);
-    }
-
-    /// <summary>
-    /// Check if item is in the queue (Time Complexity: O(1))
-    /// </summary>
-    public bool Contains(T item) => itemToIndexMap.ContainsKey(item);
-
-    public void Clear()
-    {
-        heap.Clear();
-        itemToIndexMap.Clear();
+        return true;
     }
 
     private void RemoveAt(int index)
     {
-        itemToIndexMap.Remove(heap[index].Item);
-
-        int lastIndex = heap.Count - 1;
-        if (index != lastIndex)
+        int lastIndex = Count - 1;
+        if (index == lastIndex)
         {
-            Swap(index, lastIndex);
-            heap.RemoveAt(lastIndex);
+            // If it's the last element, just remove it
+            itemToIndexMap.Remove(heap[index].Item);
+            heap.RemoveAt(index);
+            return;
+        }
 
-            HeapifyDown(index);
-            HeapifyUp(index); // Safety check
-        }
-        else
+        // Swap the element to be removed with the last element
+        Swap(index, lastIndex);
+
+        // Remove the element from the end
+        T itemToRemove = heap[lastIndex].Item;
+        itemToIndexMap.Remove(itemToRemove);
+        heap.RemoveAt(lastIndex);
+
+        // Re-heapify the swapped element
+        if (Count > 0)
         {
-            heap.RemoveAt(lastIndex);
+            HeapifyDown(index); // Try to move down first
+            HeapifyUp(index);   // If not moved down, try to move up
         }
+    }
+
+    /// <summary>
+    /// Check if an item exists (Time Complexity: O(1))
+    /// </summary>
+    public bool Contains(T item)
+    {
+        return itemToIndexMap.ContainsKey(item);
+    }
+
+    /// <summary>
+    /// Clear the entire queue (Time Complexity: O(1))
+    /// </summary>
+    public void Clear()
+    {
+        heap.Clear();
+        itemToIndexMap.Clear();
     }
 
     private void HeapifyUp(int index)
@@ -201,6 +221,7 @@ public class PriorityQueue<T>
         var result = new List<T>();
         var tempQueue = new PriorityQueue<T>();
 
+        // Deep copy items into a temporary queue
         foreach (var node in heap)
         {
             tempQueue.Enqueue(node.Item, node.Priority);

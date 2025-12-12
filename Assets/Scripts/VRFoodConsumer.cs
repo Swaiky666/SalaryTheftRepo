@@ -5,47 +5,47 @@ using UnityEngine.UI;
 
 public class VRFoodConsumer : MonoBehaviour
 {
-    [Header("激光检测设置")]
-    public Transform headTransform; // 头部Transform（通常是Main Camera）
-    public float laserLength = 0.5f; // 激光长度
-    public float coneAngle = 30f; // 圆锥角度（度）
-    public LayerMask foodLayerMask = -1; // 食物层级遮罩
+    [Header("Laser Detection Settings")]
+    public Transform headTransform; // Head Transform (usually the Main Camera)
+    public float laserLength = 0.5f; // Laser length
+    public float coneAngle = 30f; // Cone angle (degrees)
+    public LayerMask foodLayerMask = -1; // Food layer mask
 
-    [Header("消费设置")]
-    public float consumeDuration = 2f; // 吃东西的持续时间（秒）
-    public ParticleSystem eatingEffectPrefab; // 吃东西时的粒子系统预制件
-    public Transform eatingEffectSpawnPoint; // 粒子系统生成位置（例如嘴巴位置）
+    [Header("Consumption Settings")]
+    public float consumeDuration = 2f; // Duration to consume (seconds)
+    public ParticleSystem eatingEffectPrefab; // Particle system prefab for eating effect
+    public Transform eatingEffectSpawnPoint; // Spawn point for the particle effect (e.g. mouth position)
 
-    [Header("UI设置")]
-    public Slider speedBoostSlider; // 加速buff倒计时滑块（拖拽你的Slider到这里）
+    [Header("UI Settings")]
+    public Slider speedBoostSlider; // Speed boost countdown slider (assign your Slider here)
 
-    [Header("调试设置")]
-    public bool showDebugLaser = true; // 是否显示激光射线
+    [Header("Debug Settings")]
+    public bool showDebugLaser = true; // Whether to show debug laser/cone
 
-    // 私有变量
+    // Private variables
     private CharacterController characterController;
     private GameLogicSystem gameLogicSystem;
-    private CharacterStatus characterStatus; // 添加角色状态引用
+    private CharacterStatus characterStatus; // Reference to character status component
 
-    // 消费状态
-    private bool isEating = false; // 是否正在吃东西
+    // Consumption state
+    private bool isEating = false; // Whether currently eating
     private Coroutine eatingCoroutine;
-    private ParticleSystem currentEatingEffect; // 当前实例化的粒子系统
+    private ParticleSystem currentEatingEffect; // Currently instantiated particle system
 
-    // 速度加成相关
+    // Speed boost info
     private bool hasSpeedBoost = false;
-    private float originalMoveSpeed = 2f; // 原始移动速度
-    private float boostedMoveSpeed = 2f; // 加成后的移动速度
+    private float originalMoveSpeed = 2f; // Original move speed
+    private float boostedMoveSpeed = 2f; // Boosted move speed
     private Coroutine speedBoostCoroutine;
 
     void Start()
     {
-        // 获取组件
+        // Get components
         characterController = GetComponent<CharacterController>();
         gameLogicSystem = FindObjectOfType<GameLogicSystem>();
-        characterStatus = GetComponent<CharacterStatus>(); // 获取角色状态组件
+        characterStatus = GetComponent<CharacterStatus>(); // Get character status component
 
-        // 如果没有指定头部Transform，尝试找到Main Camera
+        // If head transform not specified, try to find Main Camera
         if (headTransform == null)
         {
             Camera mainCamera = Camera.main;
@@ -55,24 +55,23 @@ public class VRFoodConsumer : MonoBehaviour
             }
         }
 
-        // 如果没有指定粒子系统生成点，使用头部Transform
+        // If effect spawn point not specified, use head transform
         if (eatingEffectSpawnPoint == null)
         {
             eatingEffectSpawnPoint = headTransform;
         }
 
-        // 初始化加速buff UI状态
+        // Initialize speed boost UI state
         if (speedBoostSlider != null)
         {
             speedBoostSlider.gameObject.SetActive(false);
         }
 
-        // 获取Character Controller的原始移动速度
-        // 注意：Character Controller本身没有moveSpeed属性
-        // 你可能需要根据你的移动脚本来调整这部分
+        // Get original move speed from movement provider if available
+        // Note: CharacterController itself doesn't have moveSpeed property
+        // Adjust according to your movement implementation
         if (characterController != null)
         {
-            // 这里假设你有一个移动脚本，你需要根据实际情况调整
             var moveProvider = GetComponent<ActionBasedContinuousMoveProvider>();
             if (moveProvider != null)
             {
@@ -83,29 +82,29 @@ public class VRFoodConsumer : MonoBehaviour
 
     void Update()
     {
-        // 激光检测食物并自动消费
+        // Detect food with laser/cone and auto-consume
         DetectAndConsumeFood();
     }
 
     /// <summary>
-    /// 激光检测食物并自动消费（圆锥形检测）
+    /// Detect food with a cone-shaped laser and auto-consume
     /// </summary>
     private void DetectAndConsumeFood()
     {
         if (headTransform == null || isEating) return;
 
-        // 调试用圆锥激光显示
+        // Debug draw cone if enabled
         if (showDebugLaser)
         {
             DrawDebugCone();
         }
 
-        // 圆锥形检测
+        // Cone detection
         FoodItem closestFood = DetectFoodInCone();
 
         if (closestFood != null)
         {
-            // 激光碰到食物就直接开始吃
+            // If laser hits food, start consuming
             if (eatingCoroutine != null)
             {
                 StopCoroutine(eatingCoroutine);
@@ -115,15 +114,15 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// 在圆锥范围内检测食物
+    /// Detect food within cone range
     /// </summary>
-    /// <returns>最近的食物，如果没有则返回null</returns>
+    /// <returns>Closest food item or null if none</returns>
     private FoodItem DetectFoodInCone()
     {
         Vector3 headPosition = headTransform.position;
         Vector3 headForward = headTransform.forward;
 
-        // 使用OverlapSphere找到范围内的所有碰撞体
+        // Use OverlapSphere to find colliders in range
         Collider[] colliders = Physics.OverlapSphere(headPosition, laserLength, foodLayerMask);
 
         FoodItem closestFood = null;
@@ -131,20 +130,20 @@ public class VRFoodConsumer : MonoBehaviour
 
         foreach (Collider collider in colliders)
         {
-            // 计算到食物的方向
+            // Direction to the food
             Vector3 directionToFood = (collider.transform.position - headPosition).normalized;
 
-            // 计算角度
+            // Angle between forward and direction to food
             float angle = Vector3.Angle(headForward, directionToFood);
 
-            // 检查是否在圆锥角度内
+            // Check if inside cone angle
             if (angle <= coneAngle * 0.5f)
             {
-                // 检查是否有食物组件
+                // Check for FoodItem component
                 FoodItem foodItem = collider.GetComponent<FoodItem>();
                 if (foodItem != null)
                 {
-                    // 找到最近的食物
+                    // Pick the closest food
                     float distance = Vector3.Distance(headPosition, collider.transform.position);
                     if (distance < closestDistance)
                     {
@@ -159,7 +158,7 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// 绘制调试用的圆锥激光
+    /// Draw debug cone laser
     /// </summary>
     private void DrawDebugCone()
     {
@@ -168,16 +167,16 @@ public class VRFoodConsumer : MonoBehaviour
         Vector3 headUp = headTransform.up;
         Vector3 headRight = headTransform.right;
 
-        // 计算圆锥末端的圆形半径
+        // Cone end radius
         float coneRadius = laserLength * Mathf.Tan(coneAngle * 0.5f * Mathf.Deg2Rad);
 
-        // 圆锥末端中心点
+        // Center of cone end
         Vector3 coneEndCenter = headPosition + headForward * laserLength;
 
-        // 绘制中心线
+        // Center line
         Debug.DrawRay(headPosition, headForward * laserLength, Color.red);
 
-        // 绘制圆锥边缘线（8条线形成圆锥轮廓）
+        // Cone edge lines (8 segments)
         int segments = 8;
         for (int i = 0; i < segments; i++)
         {
@@ -185,10 +184,10 @@ public class VRFoodConsumer : MonoBehaviour
             Vector3 direction = headUp * Mathf.Sin(angle) + headRight * Mathf.Cos(angle);
             Vector3 coneEdgePoint = coneEndCenter + direction * coneRadius;
 
-            // 从头部到圆锥边缘的线
+            // Line from head to cone edge
             Debug.DrawLine(headPosition, coneEdgePoint, Color.yellow);
 
-            // 圆锥末端的圆形轮廓
+            // Circle outline at cone end
             if (i < segments - 1)
             {
                 float nextAngle = (360f / segments) * (i + 1) * Mathf.Deg2Rad;
@@ -198,7 +197,7 @@ public class VRFoodConsumer : MonoBehaviour
             }
             else
             {
-                // 连接最后一条线到第一个点
+                // Connect last segment to first
                 Vector3 firstDirection = headUp * Mathf.Sin(0) + headRight * Mathf.Cos(0);
                 Vector3 firstConeEdgePoint = coneEndCenter + firstDirection * coneRadius;
                 Debug.DrawLine(coneEdgePoint, firstConeEdgePoint, Color.green);
@@ -207,86 +206,84 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// 实例化吃东西的粒子特效
+    /// Instantiate eating particle effect
     /// </summary>
     private void StartEatingEffect()
     {
         if (eatingEffectPrefab != null && eatingEffectSpawnPoint != null)
         {
-            // 在指定位置实例化粒子系统
+            // Instantiate particle system at spawn point
             currentEatingEffect = Instantiate(eatingEffectPrefab, eatingEffectSpawnPoint.position, eatingEffectSpawnPoint.rotation);
 
-            // 将粒子系统设置为eatingEffectSpawnPoint的子对象，这样会跟随移动
+            // Parent to spawn point so it follows
             currentEatingEffect.transform.SetParent(eatingEffectSpawnPoint);
 
-            // 播放粒子系统
+            // Play particle system
             currentEatingEffect.Play();
 
-            Debug.Log("开始播放吃东西粒子特效");
+            Debug.Log("Started eating particle effect");
         }
         else
         {
-            Debug.LogWarning("吃东西粒子特效预制件或生成点未设置");
+            Debug.LogWarning("Eating effect prefab or spawn point not set");
         }
     }
 
     /// <summary>
-    /// 应用食物的粒子颜色到当前的吃东西特效
+    /// Apply particle colors to the current eating effect
     /// </summary>
-    /// <param name="startColor">粒子的开始颜色</param>
-    /// <param name="endColor">粒子的结束颜色</param>
+    /// <param name="startColor">Start color</param>
+    /// <param name="endColor">End color</param>
     private void ApplyParticleColors(Color startColor, Color endColor)
     {
         if (currentEatingEffect != null)
         {
-            // 获取主模块
+            // Access main module
             var main = currentEatingEffect.main;
 
-            // 方式一：使用双色 MinMaxGradient (推荐)
+            // Option 1: use two-color MinMaxGradient (recommended)
             ParticleSystem.MinMaxGradient gradient = new ParticleSystem.MinMaxGradient(startColor, endColor);
 
-            // ⭐ 修复 CS0426 错误：直接使用 ParticleSystemGradientMode 枚举名
-            // 这是 Unity C# 脚本中访问此嵌套枚举的最常见和正确方式。
+            // Set gradient mode to TwoColors
             gradient.mode = ParticleSystemGradientMode.TwoColors;
 
             main.startColor = gradient;
 
-            Debug.Log($"粒子颜色已设置为 Start: {startColor}, End: {endColor}");
+            Debug.Log($"Particle colors set to Start: {startColor}, End: {endColor}");
         }
     }
 
-
     /// <summary>
-    /// 停止并销毁吃东西的粒子特效
+    /// Stop and destroy the eating particle effect
     /// </summary>
     private void StopEatingEffect()
     {
         if (currentEatingEffect != null)
         {
-            // 停止粒子系统
+            // Stop particle system
             currentEatingEffect.Stop();
 
-            // 等待粒子系统完全停止后销毁（可选）
+            // Wait until stopped then destroy
             StartCoroutine(DestroyEffectAfterStop(currentEatingEffect));
 
             currentEatingEffect = null;
 
-            Debug.Log("停止吃东西粒子特效");
+            Debug.Log("Stopped eating particle effect");
         }
     }
 
     /// <summary>
-    /// 等待粒子系统停止后销毁
+    /// Wait for particle system to stop before destroying
     /// </summary>
     private IEnumerator DestroyEffectAfterStop(ParticleSystem effect)
     {
-        // 等待粒子系统不再播放
+        // Wait until particle system is no longer playing
         while (effect != null && effect.isPlaying)
         {
             yield return null;
         }
 
-        // 销毁粒子系统GameObject
+        // Destroy the particle system GameObject
         if (effect != null)
         {
             Destroy(effect.gameObject);
@@ -294,46 +291,44 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// 消费食物协程（带延迟）
+    /// Consume food coroutine (with delay)
     /// </summary>
-    /// <param name="foodItem">要消费的食物</param>
+    /// <param name="foodItem">Food item to consume</param>
     private IEnumerator ConsumeFood(FoodItem foodItem)
     {
         isEating = true;
 
-        // 设置摸鱼状态为true
+        // Set slacking state true
         if (characterStatus != null)
         {
             characterStatus.isSlackingAtWork = true;
         }
 
-        // 获取食物效果
+        // Get food effect
         FoodEffect effect = foodItem.GetFoodEffect();
 
-        // 开始吃东西粒子特效
+        // Start eating particle effect
         StartEatingEffect();
 
-        // ★★★ 关键修改：应用食物的颜色属性到粒子系统 ★★★
+        // Apply food particle colors to effect
         ApplyParticleColors(effect.particleStartColor, effect.particleEndColor);
 
+        Debug.Log($"Started consuming: {foodItem.foodName}");
 
-        Debug.Log($"开始食用: {foodItem.foodName}");
-
-
-        // 如果有压力减少效果，在吃东西过程中渐进式减少压力
+        // If effect reduces stress, apply gradually during consumption
         float stressReductionPerSecond = 0f;
         if (effect.hasStressReduction)
         {
             stressReductionPerSecond = effect.stressReduction / consumeDuration;
         }
 
-        // 吃东西过程
+        // Eating process
         float elapsedTime = 0f;
         while (elapsedTime < consumeDuration)
         {
             elapsedTime += Time.deltaTime;
 
-            // 渐进式减少压力
+            // Gradually reduce stress
             if (effect.hasStressReduction && gameLogicSystem != null)
             {
                 float stressToReduce = stressReductionPerSecond * Time.deltaTime;
@@ -343,24 +338,24 @@ public class VRFoodConsumer : MonoBehaviour
             yield return null;
         }
 
-        // 吃完后立即应用速度加成
+        // Apply speed boost immediately after eating if present
         if (effect.hasSpeedBoost)
         {
             ApplySpeedBoost(effect.speedMultiplier, effect.speedBoostDuration);
-            Debug.Log($"获得速度加成: {effect.speedMultiplier}x, 持续{effect.speedBoostDuration}秒");
+            Debug.Log($"Gained speed boost: {effect.speedMultiplier}x for {effect.speedBoostDuration} seconds");
         }
 
-        // 停止吃东西粒子特效
+        // Stop eating effect
         StopEatingEffect();
 
-        // 消费食物（删除物体）
+        // Consume the food (destroy or notify)
         foodItem.OnConsume();
 
-        Debug.Log($"食用完成: {foodItem.foodName}");
+        Debug.Log($"Finished consuming: {foodItem.foodName}");
 
         isEating = false;
 
-        // 设置摸鱼状态为false
+        // Set slacking state false
         if (characterStatus != null)
         {
             characterStatus.isSlackingAtWork = false;
@@ -370,23 +365,23 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// 应用食物效果（现在只处理速度加成，压力减少在协程中处理）
+    /// Apply food effect (currently only speed boost handled; stress reduction handled in coroutine)
     /// </summary>
-    /// <param name="effect">食物效果</param>
+    /// <param name="effect">Food effect</param>
     private void ApplyFoodEffect(FoodEffect effect)
     {
-        // 速度加成现在在协程结束时应用
-        // 压力减少现在在协程过程中渐进式处理
+        // Speed boost handled at end of coroutine
+        // Stress reduction handled gradually during coroutine
     }
 
     /// <summary>
-    /// 应用速度加成
+    /// Apply speed boost
     /// </summary>
-    /// <param name="multiplier">速度倍数</param>
-    /// <param name="duration">持续时间</param>
+    /// <param name="multiplier">Speed multiplier</param>
+    /// <param name="duration">Duration in seconds</param>
     private void ApplySpeedBoost(float multiplier, float duration)
     {
-        // 如果已经有速度加成，先停止之前的
+        // If already boosted, stop previous coroutine
         if (speedBoostCoroutine != null)
         {
             StopCoroutine(speedBoostCoroutine);
@@ -396,14 +391,14 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// 速度加成协程
+    /// Speed boost coroutine
     /// </summary>
     private IEnumerator SpeedBoostCoroutine(float multiplier, float duration)
     {
         hasSpeedBoost = true;
         boostedMoveSpeed = originalMoveSpeed * multiplier;
 
-        // 显示加速buff UI
+        // Show speed boost UI
         if (speedBoostSlider != null)
         {
             speedBoostSlider.gameObject.SetActive(true);
@@ -411,22 +406,21 @@ public class VRFoodConsumer : MonoBehaviour
             speedBoostSlider.value = duration;
         }
 
-        // 应用速度加成到移动组件
-        // 注意：这里需要根据你实际使用的移动脚本来调整
+        // Apply boosted speed to movement provider (adjust to your movement implementation)
         var moveProvider = GetComponent<ActionBasedContinuousMoveProvider>();
         if (moveProvider != null)
         {
             moveProvider.moveSpeed = boostedMoveSpeed;
         }
 
-        // 倒计时更新slider
+        // Countdown update for slider
         float remainingTime = duration;
         while (remainingTime > 0)
         {
             remainingTime -= Time.deltaTime;
             remainingTime = Mathf.Max(0, remainingTime);
 
-            // 更新slider值
+            // Update slider
             if (speedBoostSlider != null)
             {
                 speedBoostSlider.value = remainingTime;
@@ -435,32 +429,32 @@ public class VRFoodConsumer : MonoBehaviour
             yield return null;
         }
 
-        // 恢复原始速度
+        // Restore original speed
         hasSpeedBoost = false;
         if (moveProvider != null)
         {
             moveProvider.moveSpeed = originalMoveSpeed;
         }
 
-        // 隐藏加速buff UI
+        // Hide speed boost UI
         if (speedBoostSlider != null)
         {
             speedBoostSlider.gameObject.SetActive(false);
         }
 
         speedBoostCoroutine = null;
-        Debug.Log("速度加成效果结束");
+        Debug.Log("Speed boost effect ended");
     }
 
     /// <summary>
-    /// 手动触发吃东西（如果需要的话）
-    /// 现在主要是激光自动触发，这个方法作为备用
+    /// Manually trigger consume (if needed)
+    /// Mainly auto-triggered by laser; this is a fallback
     /// </summary>
     public void ManualConsumeFood()
     {
         if (headTransform == null || isEating) return;
 
-        // 使用圆锥形检测
+        // Use cone detection
         FoodItem closestFood = DetectFoodInCone();
 
         if (closestFood != null)
@@ -474,7 +468,7 @@ public class VRFoodConsumer : MonoBehaviour
     }
 
     /// <summary>
-    /// 停止吃东西（如果需要中断的话）
+    /// Stop eating (for interruptions)
     /// </summary>
     public void StopEating()
     {
@@ -482,24 +476,24 @@ public class VRFoodConsumer : MonoBehaviour
         {
             StopCoroutine(eatingCoroutine);
 
-            // 停止粒子特效
+            // Stop particle effect
             StopEatingEffect();
 
             isEating = false;
 
-            // 设置摸鱼状态为false
+            // Set slacking state false
             if (characterStatus != null)
             {
                 characterStatus.isSlackingAtWork = false;
             }
 
             eatingCoroutine = null;
-            Debug.Log("停止食用");
+            Debug.Log("Stopped consuming");
         }
     }
 
     /// <summary>
-    /// 停止速度加成（如果需要中断的话）
+    /// Stop speed boost (for interruptions)
     /// </summary>
     public void StopSpeedBoost()
     {
@@ -507,7 +501,7 @@ public class VRFoodConsumer : MonoBehaviour
         {
             StopCoroutine(speedBoostCoroutine);
 
-            // 恢复原始速度
+            // Restore original speed
             hasSpeedBoost = false;
             var moveProvider = GetComponent<ActionBasedContinuousMoveProvider>();
             if (moveProvider != null)
@@ -515,24 +509,24 @@ public class VRFoodConsumer : MonoBehaviour
                 moveProvider.moveSpeed = originalMoveSpeed;
             }
 
-            // 隐藏加速buff UI
+            // Hide speed boost UI
             if (speedBoostSlider != null)
             {
                 speedBoostSlider.gameObject.SetActive(false);
             }
 
             speedBoostCoroutine = null;
-            Debug.Log("速度加成效果被中断");
+            Debug.Log("Speed boost effect interrupted");
         }
     }
 
-    // 属性访问器
+    // Property accessors
     public bool IsEating => isEating;
     public bool HasSpeedBoost => hasSpeedBoost;
     public float CurrentMoveSpeed => hasSpeedBoost ? boostedMoveSpeed : originalMoveSpeed;
     public float SpeedBoostTimeRemaining => speedBoostSlider != null ? speedBoostSlider.value : 0f;
 
-    // 调试显示
+    // Debug gizmos
     void OnDrawGizmosSelected()
     {
         if (headTransform != null)
@@ -542,17 +536,17 @@ public class VRFoodConsumer : MonoBehaviour
             Vector3 headUp = headTransform.up;
             Vector3 headRight = headTransform.right;
 
-            // 计算圆锥末端的圆形半径
+            // Cone end radius
             float coneRadius = laserLength * Mathf.Tan(coneAngle * 0.5f * Mathf.Deg2Rad);
             Vector3 coneEndCenter = headPosition + headForward * laserLength;
 
-            // 绘制圆锥轮廓
+            // Draw cone outline
             Gizmos.color = Color.red;
 
-            // 中心线
+            // Center line
             Gizmos.DrawRay(headPosition, headForward * laserLength);
 
-            // 圆锥边缘线
+            // Cone edge lines
             int segments = 12;
             Vector3[] conePoints = new Vector3[segments];
 
@@ -563,11 +557,11 @@ public class VRFoodConsumer : MonoBehaviour
                 Vector3 coneEdgePoint = coneEndCenter + direction * coneRadius;
                 conePoints[i] = coneEdgePoint;
 
-                // 从头部到圆锥边缘的线
+                // Line from head to cone edge
                 Gizmos.DrawLine(headPosition, coneEdgePoint);
             }
 
-            // 绘制圆锥末端的圆形
+            // Draw circle at cone end
             Gizmos.color = Color.yellow;
             for (int i = 0; i < segments; i++)
             {
@@ -575,7 +569,7 @@ public class VRFoodConsumer : MonoBehaviour
                 Gizmos.DrawLine(conePoints[i], conePoints[nextIndex]);
             }
 
-            // 绘制圆锥末端的中心点
+            // Draw center point of cone end
             Gizmos.color = Color.green;
             Gizmos.DrawWireSphere(coneEndCenter, 0.05f);
         }
@@ -583,7 +577,7 @@ public class VRFoodConsumer : MonoBehaviour
 
     void OnDestroy()
     {
-        // 确保销毁时清理粒子特效
+        // Ensure particle effect cleaned up on destroy
         if (currentEatingEffect != null)
         {
             Destroy(currentEatingEffect.gameObject);

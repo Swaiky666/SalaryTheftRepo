@@ -2,115 +2,117 @@ using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 
 /// <summary>
-/// 挂载在 XR 控制器交互器 (e.g., XR Direct Interactor) 上。
-/// 监听手柄抓取和释放事件，检查被抓取的物体是否带有 ContrabandItem 脚本。
+/// Attached to an XR Interactor (e.g., XR Direct Interactor).
+/// Listens for the controller's grab and release events, checking if the grabbed object has the ContrabandItem script.
 /// </summary>
 [RequireComponent(typeof(XRBaseInteractor))]
 public class ContrabandGrabDetector : MonoBehaviour
 {
-    // 引用 CharacterStatus 脚本
+    // Reference to the CharacterStatus script
     private CharacterStatus characterStatus;
 
-    // 引用当前交互器
+    // Reference to the current Interactor
     private XRBaseInteractor interactor;
 
     void Start()
     {
-        // 1. 找到场景中的 CharacterStatus
-        // 假设 CharacterStatus 脚本挂载在一个容易找到的 GameObject 上（如玩家或 Game Manager）
+        // 1. Find CharacterStatus in the scene
+        // Assumes the CharacterStatus script is attached to an easily findable GameObject (like the player or Game Manager)
         characterStatus = FindObjectOfType<CharacterStatus>();
         if (characterStatus == null)
         {
-            Debug.LogError("[ContrabandGrabDetector] 错误：场景中未找到 CharacterStatus 组件！无法更新摸鱼状态。");
+            Debug.LogError("[ContrabandGrabDetector] Error: CharacterStatus component not found in the scene! Cannot update slacking status.");
             enabled = false;
             return;
         }
         else
         {
-            Debug.Log($"[ContrabandGrabDetector] 成功找到 CharacterStatus 组件在对象: {characterStatus.gameObject.name}");
+            Debug.Log($"[ContrabandGrabDetector] Successfully found CharacterStatus component on object: {characterStatus.gameObject.name}");
         }
 
-        // 2. 获取 Interactor 并订阅事件
+        // 2. Get Interactor and subscribe to events
         interactor = GetComponent<XRBaseInteractor>();
         if (interactor != null)
         {
-            Debug.Log($"[ContrabandGrabDetector] 成功找到 XRBaseInteractor ({interactor.GetType().Name})，正在订阅事件...");
-            // 订阅抓取开始事件
+            Debug.Log($"[ContrabandGrabDetector] Successfully found XRBaseInteractor ({interactor.GetType().Name}), subscribing to events...");
+            // Subscribe to the grab start event
             interactor.selectEntered.AddListener(OnGrabbed);
-            // 订阅抓取释放事件
+            // Subscribe to the grab release event
             interactor.selectExited.AddListener(OnReleased);
         }
         else
         {
-            Debug.LogError("[ContrabandGrabDetector] 错误：缺少 XRBaseInteractor 组件！请确保挂载在交互器上。");
+            Debug.LogError("[ContrabandGrabDetector] Error: XRBaseInteractor component not found on this GameObject!");
             enabled = false;
         }
     }
 
-    private void OnDestroy()
-    {
-        // 清理事件订阅
-        if (interactor != null)
-        {
-            interactor.selectEntered.RemoveListener(OnGrabbed);
-            interactor.selectExited.RemoveListener(OnReleased);
-        }
-    }
-
     /// <summary>
-    /// 当玩家抓取道具时调用
+    /// Called when the player grabs an item
     /// </summary>
     private void OnGrabbed(SelectEnterEventArgs args)
     {
         string grabbedObjectName = args.interactableObject.transform.name;
-        Debug.Log($"[ContrabandGrabDetector] 🛑 Grab Event Received! 抓取的对象: {grabbedObjectName}");
+        Debug.Log($"[ContrabandGrabDetector] ✋ Grab Event Received! Grabbed object: {grabbedObjectName}");
 
-        // 检查被抓取的物体 (args.interactableObject) 上是否有 ContrabandItem 组件
-        // 注意：这里使用 GetComponent<T>()，它只检查 interactableObject 所在的 GameObject。
+        // Check if the grabbed object (args.interactableObject) has the ContrabandItem component
         ContrabandItem contraband = args.interactableObject.transform.GetComponent<ContrabandItem>();
 
         if (contraband != null)
         {
-            // 如果找到了 ContrabandItem，说明这是违禁品
+            // If it has ContrabandItem, it means it's contraband
             if (characterStatus != null)
             {
                 characterStatus.isSlackingAtWork = true;
-                Debug.Log($"[ContrabandGrabDetector] ✅ 识别为违禁品 ({grabbedObjectName})！摸鱼状态 (isSlackingAtWork) 已设为: True");
+                Debug.Log($"[ContrabandGrabDetector] ✅ Identified as Contraband ({grabbedObjectName})! Slacking status (isSlackingAtWork) set to: True");
             }
             else
             {
-                Debug.LogError("[ContrabandGrabDetector] ❌ 找到违禁品，但 characterStatus 引用丢失，无法更新状态！");
+                Debug.LogError("[ContrabandGrabDetector] ❌ Contraband found, but characterStatus reference is lost, cannot update status!");
             }
         }
         else
         {
-            Debug.Log("[ContrabandGrabDetector] ❓ 抓取的不是违禁品。未找到 ContrabandItem 脚本。");
+            Debug.Log("[ContrabandGrabDetector] ❓ Grabbed object is not contraband. ContrabandItem script not found.");
         }
     }
 
     /// <summary>
-    /// 当玩家松开道具时调用
+    /// Called when the player releases an item
     /// </summary>
     private void OnReleased(SelectExitEventArgs args)
     {
         string releasedObjectName = args.interactableObject.transform.name;
-        Debug.Log($"[ContrabandGrabDetector] 🗑️ Release Event Received! 释放的对象: {releasedObjectName}");
+        Debug.Log($"[ContrabandGrabDetector] 🗑️ Release Event Received! Released object: {releasedObjectName}");
 
-        // 检查被释放的物体 (args.interactableObject) 上是否有 ContrabandItem 组件
+        // Check if the released object (args.interactableObject) has the ContrabandItem component
         ContrabandItem contraband = args.interactableObject.transform.GetComponent<ContrabandItem>();
 
         if (contraband != null)
         {
-            // 只有当释放的是违禁品时，才将摸鱼状态设为 false
+            // Only reset the slacking status to false if contraband was released
             if (characterStatus != null)
             {
                 characterStatus.isSlackingAtWork = false;
-                Debug.Log($"[ContrabandGrabDetector] ✅ 释放了违禁品 ({releasedObjectName})。摸鱼状态 (isSlackingAtWork) 已设为: False");
+                Debug.Log($"[ContrabandGrabDetector] ✅ Contraband released ({releasedObjectName}). Slacking status (isSlackingAtWork) set to: False");
             }
-            else
-            {
-                Debug.LogError("[ContrabandGrabDetector] ❌ 释放违禁品，但 characterStatus 引用丢失，无法更新状态！");
-            }
+        }
+        else
+        {
+            // If released object is not contraband, do nothing or log for debug
+            // The status should have been set to false by other means if necessary, or kept true if other contraband is held.
+            // For simplicity, we only reset the status when contraband is explicitly released.
+        }
+    }
+
+    void OnDestroy()
+    {
+        // Unsubscribe from events to prevent memory leaks or calling on destroyed objects
+        if (interactor != null)
+        {
+            interactor.selectEntered.RemoveListener(OnGrabbed);
+            interactor.selectExited.RemoveListener(OnReleased);
+            Debug.Log("[ContrabandGrabDetector] Events unsubscribed.");
         }
     }
 }

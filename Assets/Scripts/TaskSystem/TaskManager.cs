@@ -6,33 +6,33 @@ using System;
 using Random = UnityEngine.Random;
 
 /// <summary>
-/// 任务类型枚举
+/// Task type enumeration
 /// </summary>
 public enum TaskType
 {
-    Print = 0,      // 打印任务
-    Clean = 1,      // 清理任务
-    Discussion = 2, // 讨论任务
+    Print = 0,      // Print Task
+    Clean = 1,      // Clean-up Task
+    Discussion = 2, // Discussion Task
 }
 
 /// <summary>
-/// 任务数据类
+/// Task Data Class
 /// </summary>
 [Serializable]
 public class TaskData
 {
-    public int taskId;              // 任务ID
-    public string taskName;         // 任务名称
-    public string taskDescription;  // 任务描述
-    public string displayText;      // 任务完成器显示文本
-    public TaskType taskType;       // 任务类型
-    public bool isCompleted;        // 是否已完成
-    public bool isRepeatable;       // 是否可重复（用于清理任务等）
+    public int taskId;              // Task ID
+    public string taskName;         // Task Name
+    public string taskDescription;  // Task Description
+    public string displayText;      // Display text for the task completer
+    public TaskType taskType;       // Task Type
+    public bool isCompleted;        // Is Completed
+    public bool isRepeatable;       // Is Repeatable (e.g., for clean-up tasks)
 
     // CS400 Enhancement: Priority-based scheduling
-    public float priority;          // 任务优先级 (值越小优先级越高)
-    public float deadline;          // 截止时间（秒）
-    public float rewardMultiplier;  // 奖励倍数
+    public float priority;          // Task Priority (lower value is higher priority)
+    public float deadline;          // Deadline (seconds)
+    public float rewardMultiplier;  // Reward Multiplier
 
     public TaskData(int id, string name, string description, TaskType type, string display = "", bool repeatable = false, float priority = 0f, float deadline = 300f, float reward = 1f)
     {
@@ -49,7 +49,7 @@ public class TaskData
     }
 
     /// <summary>
-    /// 计算动态优先级（考虑截止时间和奖励）
+    /// Calculates dynamic priority (considering deadline and reward)
     /// Time Complexity: O(1)
     /// </summary>
     public float CalculateDynamicPriority(float currentTime)
@@ -57,34 +57,34 @@ public class TaskData
         float timeRemaining = Mathf.Max(0, deadline - currentTime);
         float urgency = deadline > 0 ? (1f - (timeRemaining / deadline)) : 0f;
 
-        // 优先级 = 基础优先级 - (紧急度 * 权重) - (奖励倍数 * 权重)
+        // Priority = Base Priority - (Urgency * Weight) - (Reward Multiplier * Weight)
         return priority - (urgency * 5f) - (rewardMultiplier * 1f);
     }
 }
 
 /// <summary>
-/// 任务管理器 - CS400 Enhanced Version
+/// Task Manager - CS400 Enhanced Version
 /// </summary>
 public class TaskManager : MonoBehaviour
 {
-    [Header("UI设置")]
+    [Header("UI Settings")]
     [SerializeField] private TextMeshProUGUI[] taskTexts = new TextMeshProUGUI[3];
 
-    [Header("任务处理器")]
+    [Header("Task Handlers")]
     [SerializeField] private PrintTaskHandler printTaskHandler;
     [SerializeField] private CleanTaskHandler cleanTaskHandler;
 
-    [Header("游戏逻辑系统")]
+    [Header("Game Logic System")]
     [SerializeField] private GameLogicSystem gameLogicSystem;
 
-    [Header("任务设置")]
+    [Header("Task Settings")]
     [SerializeField] private int maxDailyTasks = 3;
     [SerializeField] private bool usePriorityScheduling = true;
 
-    [Header("工作进度设置")]
+    [Header("Work Progress Settings")]
     [SerializeField] private float workProgressPerTask = 10f;
 
-    [Header("调试设置")]
+    [Header("Debug Settings")]
     [SerializeField] private bool enableDebugLog = true;
     [SerializeField] private bool showPerformanceMetrics = true;
 
@@ -102,8 +102,8 @@ public class TaskManager : MonoBehaviour
 
     private const string NO_TASK_TEXT = "No Task";
     private const string TASK_COMPLETED_TEXT = "Task Completed";
-    private const string REPEATABLE_COMPLETED_TEXT = "已完成（可重复完成）";
-    private static readonly Color DEFAULT_COLOR = Color.white; // 默认颜色设置为白色
+    private const string REPEATABLE_COMPLETED_TEXT = "Completed (Repeatable)";
+    private static readonly Color DEFAULT_COLOR = Color.white; // Default color set to white
     private static readonly Color COMPLETED_COLOR = Color.green;
     private static readonly Color REPEATABLE_COLOR = Color.cyan;
     private static readonly Color NO_TASK_COLOR = Color.gray;
@@ -134,7 +134,7 @@ public class TaskManager : MonoBehaviour
         }
     }
 
-    // --- 初始化和验证方法 ---
+    // --- Initialization and Validation Methods ---
 
     private void InitializeTaskHandlers()
     {
@@ -155,21 +155,21 @@ public class TaskManager : MonoBehaviour
     {
         availableTasks.Clear();
 
-        // 打印任务 
+        // Print Tasks 
         availableTasks.Add(new TaskData(1, "Print Report", "Print the daily report", TaskType.Print, "Need Report", false, priority: 2f, deadline: 180f, reward: 1.5f));
         availableTasks.Add(new TaskData(2, "Print Manual", "Print instruction manual", TaskType.Print, "Need Manual", false, priority: 5f, deadline: 300f, reward: 1.0f));
         availableTasks.Add(new TaskData(3, "Print Invoice", "Print invoice document", TaskType.Print, "Need Invoice", false, priority: 1f, deadline: 120f, reward: 2.0f));
         availableTasks.Add(new TaskData(4, "Print Contract", "Print contract papers", TaskType.Print, "Need Contract", false, priority: 3f, deadline: 240f, reward: 1.8f));
         availableTasks.Add(new TaskData(5, "Print Schedule", "Print work schedule", TaskType.Print, "Need Schedule", false, priority: 7f, deadline: 360f, reward: 1.2f));
 
-        // 清理任务 
+        // Clean-up Tasks 
         availableTasks.Add(new TaskData(6, "Clean Office", "Clean up the office space", TaskType.Clean, "Clean 5 items", true, priority: 4f, deadline: 300f, reward: 1.0f));
         availableTasks.Add(new TaskData(7, "Organize Workspace", "Organize and clean workspace", TaskType.Clean, "Clean 5 items", true, priority: 6f, deadline: 360f, reward: 1.1f));
         availableTasks.Add(new TaskData(8, "Trash Removal", "Remove trash from work area", TaskType.Clean, "Clean 5 items", true, priority: 3f, deadline: 200f, reward: 1.3f));
         availableTasks.Add(new TaskData(9, "Maintenance Clean", "Perform maintenance cleaning", TaskType.Clean, "Clean 5 items", true, priority: 8f, deadline: 400f, reward: 0.9f));
 
         if (enableDebugLog)
-            Debug.Log($"[TaskManager] 任务库已初始化，共 {availableTasks.Count} 个任务");
+            Debug.Log($"[TaskManager] Task database initialized with {availableTasks.Count} tasks");
     }
 
     private void ValidateComponents()
@@ -177,7 +177,7 @@ public class TaskManager : MonoBehaviour
         for (int i = 0; i < taskTexts.Length; i++)
         {
             if (taskTexts[i] == null)
-                Debug.LogWarning($"[TaskManager] 任务文本 {i + 1} 未设置");
+                Debug.LogWarning($"[TaskManager] Task Text {i + 1} is not set");
         }
 
         if (gameLogicSystem == null)
@@ -186,7 +186,7 @@ public class TaskManager : MonoBehaviour
         }
     }
 
-    // --- 任务生成方法 ---
+    // --- Task Generation Methods ---
 
     private TaskData CloneTaskData(TaskData original)
     {
@@ -204,7 +204,7 @@ public class TaskManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 固定生成 1 个清理任务和 2 个打印任务。
+    /// Fixed generation of 1 clean-up task and 2 print tasks.
     /// </summary>
     private void GenerateDailyTasks()
     {
@@ -219,15 +219,15 @@ public class TaskManager : MonoBehaviour
         List<TaskData> cleanTasks = availableTasks.FindAll(t => t.taskType == TaskType.Clean);
         List<TaskData> printTasks = availableTasks.FindAll(t => t.taskType == TaskType.Print);
 
-        // 1. 固定选取 1 个清理任务
+        // 1. Fixed selection of 1 clean-up task
         if (cleanTasks.Count > 0)
         {
             TaskData selectedCleanTask = cleanTasks[Random.Range(0, cleanTasks.Count)];
             selectedTasks.Add(CloneTaskData(selectedCleanTask));
         }
-        else { Debug.LogError("[TaskManager] 任务库中没有可用的清理任务！"); }
+        else { Debug.LogError("[TaskManager] No available clean-up tasks in the task database!"); }
 
-        // 2. 固定选取 2 个打印任务
+        // 2. Fixed selection of 2 print tasks
         if (printTasks.Count >= 2)
         {
             List<int> printIndices = new List<int>();
@@ -247,29 +247,29 @@ public class TaskManager : MonoBehaviour
             {
                 selectedTasks.Add(CloneTaskData(task));
             }
-            Debug.LogWarning($"[TaskManager] 任务库中只有 {printTasks.Count} 个打印任务，不足 2 个。");
+            Debug.LogWarning($"[TaskManager] Only {printTasks.Count} print tasks in the database, less than 2.");
         }
-        else { Debug.LogError("[TaskManager] 任务库中没有可用的打印任务！"); }
+        else { Debug.LogError("[TaskManager] No available print tasks in the task database!"); }
 
-        // 3. 将选取的任务实例化并加入活跃列表
+        // 3. Instantiate the selected tasks and add them to the active list
         foreach (var newTask in selectedTasks)
         {
             activeTasks.Add(newTask);
             taskLookupTable[newTask.taskId] = newTask;
         }
 
-        // 4. 任务排序（使用动态优先级）
+        // 4. Task sorting (using dynamic priority)
         List<TaskData> orderedTasks = new List<TaskData>(activeTasks);
         orderedTasks.Sort((a, b) => a.CalculateDynamicPriority(Time.time - gameStartTime).CompareTo(b.CalculateDynamicPriority(Time.time - gameStartTime)));
 
-        // 5. 将任务添加到优先级队列
+        // 5. Add tasks to the priority queue
         foreach (var task in orderedTasks)
         {
             float currentPriority = task.CalculateDynamicPriority(Time.time - gameStartTime);
             taskPriorityQueue.Enqueue(task, currentPriority);
         }
 
-        // 6. 启动任务并建立槽位映射
+        // 6. Start tasks and establish slot mapping
         for (int slot = 0; slot < Mathf.Min(orderedTasks.Count, maxDailyTasks); slot++)
         {
             TaskData task = orderedTasks[slot];
@@ -284,10 +284,10 @@ public class TaskManager : MonoBehaviour
         float endTime = Time.realtimeSinceStartup;
 
         if (enableDebugLog)
-            Debug.Log($"[TaskManager] 🚀 生成并启动了 {activeTasks.Count} 个任务 (1 清理, 2 打印). 耗时: {(endTime - startTime) * 1000f:F2}ms");
+            Debug.Log($"[TaskManager] 🚀 Generated and started {activeTasks.Count} tasks (1 Clean-up, 2 Print). Time taken: {(endTime - startTime) * 1000f:F2}ms");
     }
 
-    // --- 任务进度和回调方法 ---
+    // --- Task Progress and Callback Methods ---
 
     private void UpdateTaskPriorities()
     {
@@ -305,7 +305,7 @@ public class TaskManager : MonoBehaviour
                 }
             }
         }
-        // 不需要在这里调用 UpdateTaskUI，因为它会在每次完成任务后调用
+        // No need to call UpdateTaskUI here, as it's called after every task completion
     }
 
     public void UpdateTaskUI()
@@ -328,9 +328,9 @@ public class TaskManager : MonoBehaviour
                 else
                 {
                     taskTexts[i].text = GetTaskDisplayName(task);
-                    // **********************************************
-                    // * 移除根据优先级改变颜色的逻辑，只使用默认颜色 *
-                    // **********************************************
+                    // *******************************************************************
+                    // * Removed logic to change color based on priority, using default color *
+                    // *******************************************************************
                     taskTexts[i].color = DEFAULT_COLOR;
                 }
             }
@@ -356,7 +356,7 @@ public class TaskManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 任务完成回调
+    /// Task Completion Callback
     /// </summary>
     public void TaskCompleted(int taskId, int taskIndex)
     {
@@ -377,7 +377,7 @@ public class TaskManager : MonoBehaviour
             UpdateTaskUI();
 
             if (enableDebugLog)
-                Debug.Log($"[TaskManager] 🎉 任务 {completedTask.taskName} (ID: {taskId}) 已标记完成");
+                Debug.Log($"[TaskManager] 🎉 Task {completedTask.taskName} (ID: {taskId}) marked as completed");
 
             CheckAllTasksCompleted();
         }
@@ -385,7 +385,7 @@ public class TaskManager : MonoBehaviour
         {
             AddWorkProgressForCompletedTask(completedTask);
             if (enableDebugLog)
-                Debug.Log($"[TaskManager] 🔁 可重复任务 {completedTask.taskName} 再次完成，进度增加。");
+                Debug.Log($"[TaskManager] 🔁 Repeatable task {completedTask.taskName} completed again, progress increased.");
         }
     }
 
@@ -397,7 +397,7 @@ public class TaskManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 增加工作进度 (来自任务处理器持续进度)
+    /// Add work progress (from continuous progress of task handler)
     /// </summary>
     public void AddWorkProgress(float amount, string sourceName, bool isContinuous)
     {
@@ -406,7 +406,7 @@ public class TaskManager : MonoBehaviour
 
         if (enableDebugLog && isContinuous)
         {
-            Debug.Log($"[TaskManager] ➕ 任务处理器 '{sourceName}' 增加工作进度: +{amount:F2}% (持续进度)");
+            Debug.Log($"[TaskManager] ➕ Task Handler '{sourceName}' added work progress: +{amount:F2}% (Continuous Progress)");
         }
     }
 
@@ -440,18 +440,18 @@ public class TaskManager : MonoBehaviour
         {
             float bonusProgress = workProgressPerTask * 0.5f;
             gameLogicSystem.AddWorkProgress(bonusProgress);
-            if (enableDebugLog) Debug.Log($"[TaskManager] 🏆 全部不可重复任务完成奖励: +{bonusProgress}% 工作进度");
+            if (enableDebugLog) Debug.Log($"[TaskManager] 🏆 Bonus for all non-repeatable tasks completed: +{bonusProgress}% Work Progress");
         }
     }
 
-    // --- 数据访问和清理方法 ---
+    // --- Data Access and Cleanup Methods ---
 
     /// <summary>
-    /// 根据任务类型和进度生成任务板上显示的名称。
+    /// Generates the name displayed on the task board based on task type and progress.
     /// </summary>
     public string GetTaskDisplayName(TaskData taskData)
     {
-        if (taskData == null) return "任务数据缺失";
+        if (taskData == null) return "Missing Task Data";
         int taskIndex = activeTasks.IndexOf(taskData);
         if (taskIndex < 0) return taskData.taskName;
 
@@ -464,12 +464,12 @@ public class TaskManager : MonoBehaviour
                 int cleanedCount = handler.GetTaskCleanProgress(taskIndex);
                 int totalRequired = handler.RubbishToCleanForCompletion;
 
-                // 清理任务: 任务名 (已清理垃圾数量/一共垃圾数量)
+                // Clean-up Task: Task Name (Items Cleaned/Total Items)
                 return $"{taskData.taskName} ({cleanedCount}/{totalRequired})";
             }
         }
 
-        // 其他任务: 任务名
+        // Other Tasks: Task Name
         return taskData.taskName;
     }
 
@@ -503,7 +503,7 @@ public class TaskManager : MonoBehaviour
         CleanupAllTasks();
     }
 
-    // --- 属性访问器 ---
+    // --- Property Accessors ---
 
     public List<TaskData> GetDailyTasks() => activeTasks;
     public ITaskHandler GetTaskHandler(TaskType taskType)
@@ -517,24 +517,24 @@ public class TaskManager : MonoBehaviour
         set => workProgressPerTask = Mathf.Max(0.1f, value);
     }
 
-    // --- 调试方法 ---
+    // --- Debug Methods ---
 
-    [ContextMenu("重新生成任务")]
+    [ContextMenu("Regenerate Daily Tasks")]
     public void RegenerateDailyTasks()
     {
         CleanupAllTasks(true);
         GenerateDailyTasks();
         UpdateTaskUI();
         if (enableDebugLog)
-            Debug.Log("[TaskManager] ♻️ 任务已重新生成和启动");
+            Debug.Log("[TaskManager] ♻️ Tasks regenerated and started");
     }
 
-    [ContextMenu("手动完成优先级最高的任务")]
+    [ContextMenu("Manually Complete Highest Priority Task")]
     public void ManualCompleteFirstTask()
     {
         if (taskPriorityQueue.Count == 0)
         {
-            Debug.Log("[TaskManager] 优先级队列中没有任务。");
+            Debug.Log("[TaskManager] No tasks in the priority queue.");
             return;
         }
 
@@ -549,47 +549,47 @@ public class TaskManager : MonoBehaviour
                 if (handler != null)
                 {
                     handler.ForceCompleteTask(taskIndex);
-                    Debug.Log($"[TaskManager Debug] 强制完成清理任务: {taskToComplete.taskName}");
+                    Debug.Log($"[TaskManager Debug] Force completed Clean-up task: {taskToComplete.taskName}");
                 }
             }
             else
             {
                 TaskCompleted(taskToComplete.taskId, taskIndex);
-                Debug.Log($"[TaskManager Debug] 强制完成任务: {taskToComplete.taskName}");
+                Debug.Log($"[TaskManager Debug] Force completed task: {taskToComplete.taskName}");
             }
         }
         else
         {
-            Debug.LogError($"[TaskManager Debug] 优先级队列中的任务ID {taskToComplete.taskId} 未在活跃列表中找到。");
+            Debug.LogError($"[TaskManager Debug] Task ID {taskToComplete.taskId} from priority queue not found in active list.");
         }
         UpdateTaskUI();
     }
 
-    [ContextMenu("切换优先级调度模式")]
+    [ContextMenu("Toggle Priority Scheduling Mode")]
     public void TogglePriorityScheduling()
     {
         usePriorityScheduling = !usePriorityScheduling;
         if (enableDebugLog)
-            Debug.Log($"[TaskManager] 优先级调度已{(usePriorityScheduling ? "启用" : "禁用")}");
+            Debug.Log($"[TaskManager] Priority scheduling is now {(usePriorityScheduling ? "enabled" : "disabled")}");
         UpdateTaskUI();
     }
 
-    [ContextMenu("检查管理器状态")]
+    [ContextMenu("Check Manager Status")]
     public void CheckManagerStatus()
     {
-        Debug.Log($"[TaskManager] === 管理器状态检查 === (CS400)");
-        Debug.Log($"当前时间: {Time.time - gameStartTime:F1}s");
-        Debug.Log($"工作进度: {(gameLogicSystem != null ? gameLogicSystem.WorkProgress.ToString("F1") + "%" : "N/A")}");
-        Debug.Log($"活跃任务数量: {activeTasks.Count}");
-        Debug.Log($"优先级队列大小: {taskPriorityQueue.Count}");
+        Debug.Log($"[TaskManager] === Manager Status Check === (CS400)");
+        Debug.Log($"Current Time: {Time.time - gameStartTime:F1}s");
+        Debug.Log($"Work Progress: {(gameLogicSystem != null ? gameLogicSystem.WorkProgress.ToString("F1") + "%" : "N/A")}");
+        Debug.Log($"Active Tasks Count: {activeTasks.Count}");
+        Debug.Log($"Priority Queue Size: {taskPriorityQueue.Count}");
 
-        Debug.Log("--- 活跃任务详情 (按优先级): ---");
+        Debug.Log("--- Active Task Details (by Priority): ---");
 
         List<TaskData> orderedTasks = taskPriorityQueue.GetAllInPriorityOrder();
         if (orderedTasks.Count == 0 && activeTasks.Count > 0)
         {
             orderedTasks = activeTasks;
-            Debug.Log("(队列为空，显示活跃任务列表)");
+            Debug.Log("(Queue is empty, displaying active tasks list)");
         }
 
         for (int i = 0; i < orderedTasks.Count; i++)
@@ -598,7 +598,7 @@ public class TaskManager : MonoBehaviour
             float currentPriority = task.CalculateDynamicPriority(Time.time - gameStartTime);
             int activeIndex = activeTasks.IndexOf(task);
 
-            string status = task.isCompleted ? (task.isRepeatable ? "已完成(可重复)" : "已完成") : "进行中";
+            string status = task.isCompleted ? (task.isRepeatable ? "Completed (Repeatable)" : "Completed") : "In Progress";
 
             Debug.Log($"- Slot {i}: ID={task.taskId}, Name='{task.taskName}', Type={task.taskType}, Status={status}, Index={activeIndex}, Priority={currentPriority:F2}");
         }

@@ -1,33 +1,33 @@
 ﻿using UnityEngine;
 
 /// <summary>
-/// 任务处理器接口
-/// 所有任务处理器都需要实现此接口
+/// Task Handler Interface
+/// All task handlers must implement this interface
 /// </summary>
 public interface ITaskHandler
 {
     /// <summary>
-    /// 初始化任务处理器
+    /// Initializes the task handler
     /// </summary>
-    /// <param name="taskManager">任务管理器引用</param>
+    /// <param name="taskManager">Reference to the Task Manager</param>
     void Initialize(TaskManager taskManager);
 
     /// <summary>
-    /// 检查是否可以处理指定类型的任务
+    /// Checks if the handler can process the specified task type
     /// </summary>
-    /// <param name="taskType">任务类型</param>
-    /// <returns>是否可以处理</returns>
+    /// <param name="taskType">Task Type</param>
+    /// <returns>True if it can handle the task, otherwise false</returns>
     bool CanHandleTask(TaskType taskType);
 
     /// <summary>
-    /// 开始执行任务
+    /// Starts the task execution
     /// </summary>
-    /// <param name="taskData">任务数据</param>
-    /// <param name="taskIndex">任务在活跃列表中的索引</param>
+    /// <param name="taskData">Task Data</param>
+    /// <param name="taskIndex">The index of the task in the active list</param>
     void StartTask(TaskData taskData, int taskIndex);
 
     /// <summary>
-    /// 清理任务相关对象
+    /// Cleans up task-related objects
     /// </summary>
     void CleanupTasks();
 }
