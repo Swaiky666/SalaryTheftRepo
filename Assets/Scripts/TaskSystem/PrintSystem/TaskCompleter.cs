@@ -1,80 +1,104 @@
 ﻿using UnityEngine;
 using TMPro;
+using System.Collections; // Required for IEnumerator and WaitForSeconds
 
 /// <summary>
-/// 任务完成器组件
-/// 负责检测任务道具并完成任务
+/// Task Completer Component.
+/// Responsible for detecting required task items and completing the task.
 /// </summary>
 public class TaskCompleter : MonoBehaviour
 {
-    [Header("设置")]
-    [SerializeField] private string requiredItemTag = "TaskMaterial"; // 需要的物品标签
-    [SerializeField] private int taskIndex = -1; // 对应的任务索引
-    [SerializeField] private bool enableDebugLog = true; // 启用调试日志
+    [Header("Settings")]
+    [SerializeField] private string requiredItemTag = "TaskMaterial"; // Tag of the item required to complete the task
+    [SerializeField] private int taskIndex = -1; // Corresponding task index
+    [SerializeField] private bool enableDebugLog = true; // Enables debug logs
 
-    // FIX: 重新添加公共属性以供 PrintTaskHandler 访问
+    // Reference for the Particle System attached to this GameObject
+    [Header("Particle Effects")]
+    [SerializeField] private ParticleSystem completionParticle; // Particle system to play upon task completion
+
+    /// <summary>
+    /// Public property to access the task index for PrintTaskHandler.
+    /// </summary>
     public int TaskIndex => taskIndex;
 
-    // 私有变量
-    private PrintTaskHandler taskHandler; // 任务处理器引用
-    private bool isInitialized = false; // 是否已初始化
-    private Collider triggerCollider; // 触发器碰撞体
-    private TextMeshProUGUI taskDescriptionText; // 任务描述文本（自动查找）
+    // Private variables
+    private PrintTaskHandler taskHandler; // Task handler reference (used for type checking, though TaskManager is the callback target)
+    private TaskManager taskManager; // [New/Implicit] TaskManager reference (if TaskHandler passes it down)
+    private bool isInitialized = false; // Flag indicating if initialization is complete
+    private Collider triggerCollider; // Reference to the trigger collider
+    private TextMeshProUGUI taskDescriptionText; // Task description text component (automatically searched)
+    private bool isTaskFinished = false; // Flag to prevent duplicate task completion
 
     void Start()
     {
-        // 确保有触发器碰撞体
+        // Ensure there is a trigger collider
         SetupTriggerCollider();
 
-        // 自动查找Text组件
+        // Automatically find the Text component
         FindTextComponent();
+        
+        // Automatically find the Particle System if not manually set
+        if (completionParticle == null)
+        {
+            completionParticle = GetComponent<ParticleSystem>();
+            if (completionParticle == null && enableDebugLog)
+                Debug.LogWarning("[TaskCompleter] ParticleSystem component not found on this GameObject. No particle effect will play before destruction.");
+        }
     }
 
     /// <summary>
-    /// 初始化任务完成器
+    /// Initializes the Task Completer with required settings.
     /// </summary>
-    /// <param name="itemTag">需要的物品标签</param>
-    /// <param name="index">任务索引</param>
-    /// <param name="handler">任务处理器引用</param>
-    /// <param name="displayText">显示的任务描述文本</param>
+    /// <param name="itemTag">The tag of the required item.</param>
+    /// <param name="index">The task index in TaskManager's active list.</param>
+    /// <param name="handler">Reference to the Print Task Handler (caller).</param>
+    /// <param name="displayText">The display text for the task description.</param>
     public void Initialize(string itemTag, int index, PrintTaskHandler handler, string displayText)
     {
         requiredItemTag = itemTag;
         taskIndex = index;
         taskHandler = handler;
+        // Assuming PrintTaskHandler has a way to reference TaskManager, or we find it.
+        // For simplicity and assuming TaskManager is the core system:
+        if (taskManager == null)
+        {
+            taskManager = FindObjectOfType<TaskManager>();
+        }
+
         isInitialized = true;
 
-        // 确保找到Text组件
+        // Ensure the Text component is found
         if (taskDescriptionText == null)
         {
             FindTextComponent();
         }
 
-        // 设置任务描述文本
+        // Set the task description text
         SetTaskDescriptionText(displayText);
 
         if (enableDebugLog)
-            Debug.Log($"[TaskCompleter] 已初始化 - 任务索引: {taskIndex}, 需要物品标签: {requiredItemTag}, 显示文本: {displayText}");
+            Debug.Log($"[TaskCompleter] Initialized - Task Index: {taskIndex}, Required Item Tag: {requiredItemTag}, Display Text: {displayText}");
     }
 
     /// <summary>
-    /// 自动查找Text组件
+    /// Automatically searches for the TextMeshProUGUI component in children.
     /// </summary>
     private void FindTextComponent()
     {
-        // 在子对象中查找TextMeshProUGUI组件
+        // Search for TextMeshProUGUI component in children
         taskDescriptionText = GetComponentInChildren<TextMeshProUGUI>();
 
         if (taskDescriptionText == null)
         {
-            Debug.LogWarning("[TaskCompleter] 未找到TextMeshProUGUI组件，任务描述将无法显示");
+            Debug.LogWarning("[TaskCompleter] TextMeshProUGUI component not found, task description will not be displayed.");
         }
     }
 
     /// <summary>
-    /// 设置任务描述文本
+    /// Sets the task description text.
     /// </summary>
-    /// <param name="displayText">要显示的文本</param>
+    /// <param name="displayText">The text to display.</param>
     private void SetTaskDescriptionText(string displayText)
     {
         if (taskDescriptionText != null)
@@ -84,7 +108,7 @@ public class TaskCompleter : MonoBehaviour
     }
 
     /// <summary>
-    /// 设置触发器碰撞体
+    /// Sets up the trigger collider. Adds a BoxCollider if none exists and ensures it's a trigger.
     /// </summary>
     private void SetupTriggerCollider()
     {
@@ -102,99 +126,153 @@ public class TaskCompleter : MonoBehaviour
     }
 
     /// <summary>
-    /// 触发器进入事件
+    /// Trigger Enter Event.
     /// </summary>
-    /// <param name="other">进入的碰撞体</param>
+    /// <param name="other">The entering collider.</param>
     void OnTriggerEnter(Collider other)
     {
-        if (!isInitialized)
+        if (!isInitialized || isTaskFinished || taskManager == null)
         {
-            if (enableDebugLog)
-                Debug.LogWarning("[TaskCompleter] 未初始化，忽略触发事件");
+            if (enableDebugLog) 
+                Debug.LogWarning("[TaskCompleter] Not ready, manager is null, or already finished, ignoring trigger.");
             return;
         }
 
-        if (taskHandler == null)
-        {
-            Debug.LogError("[TaskCompleter] TaskHandler引用为空");
-            return;
-        }
-
-        // 检查物品标签
+        // Check the item tag
         if (other.CompareTag(requiredItemTag))
         {
             if (enableDebugLog)
-                Debug.Log($"[TaskCompleter] ✅ 检测到正确的任务道具: {other.name} (标签: {requiredItemTag})");
+                Debug.Log($"[TaskCompleter] ✅ Correct task item detected: {other.name} (Tag: {requiredItemTag})");
 
-            // 销毁任务道具
+            // Destroy the task item
             Destroy(other.gameObject);
 
-            // 通知任务处理器任务完成
-            taskHandler.OnTaskCompleted(taskIndex, gameObject);
+            // Start the task completion sequence.
+            StartTaskCompletionSequence();
         }
         else
         {
             if (enableDebugLog)
-                Debug.Log($"[TaskCompleter] ❌ 物品标签不匹配: 需要 '{requiredItemTag}', 实际 '{other.tag}'");
+                Debug.Log($"[TaskCompleter] ❌ Item tag mismatch: Required '{requiredItemTag}', Actual '{other.tag}'");
         }
     }
 
     /// <summary>
-    /// 手动完成任务（调试用）
+    /// Initiates the task completion sequence (play particles, delayed destroy, and THEN notify manager).
     /// </summary>
-    [ContextMenu("手动完成任务")]
+    private void StartTaskCompletionSequence()
+    {
+        isTaskFinished = true; // Mark task as completed
+        
+        // Start the coroutine for particle playback and delayed destruction of THIS GameObject
+        // The manager notification is moved into the coroutine to prevent premature destruction by the external TaskManager.
+        StartCoroutine(TaskCompleteSequence(1.5f)); 
+    }
+
+    /// <summary>
+    /// Coroutine for playing particle system and destroying THIS Task Completer GameObject after a delay.
+    /// </summary>
+    /// <param name="delay">The delay time before THIS GameObject is destroyed.</param>
+    /// <returns>IEnumerator</returns>
+    private IEnumerator TaskCompleteSequence(float delay)
+    {
+        // 1. Play particles immediately
+        if (completionParticle != null)
+        {
+            completionParticle.Play();
+            if (enableDebugLog)
+                Debug.Log($"[TaskCompleter] 💫 Playing particle system: {completionParticle.name}");
+        }
+        
+        // 2. Wait for the specified delay (1.5 seconds)
+        yield return new WaitForSeconds(delay);
+        
+        // 3. Notify the Task Manager that the task is complete. 
+        // We do this now, right before destruction, to allow time for the particle effect.
+        if (taskManager != null)
+        {
+            // Note: We need the TaskData ID. Assuming TaskHandler stores TaskData, or we use the taskIndex.
+            // Using TaskIndex as it's passed during initialization and used in TaskManager's callback.
+            TaskData taskData = taskManager.GetDailyTasks().Find(t => taskManager.GetDailyTasks().IndexOf(t) == taskIndex);
+            
+            if (taskData != null)
+            {
+                taskManager.TaskCompleted(taskData.taskId, taskIndex);
+            }
+            else
+            {
+                 // Fallback if taskData lookup is difficult/impossible at this stage
+                 // This ensures the task is completed even if the ID is missing.
+                 Debug.LogWarning("[TaskCompleter] Could not find TaskData for completion notification, using TaskIndex.");
+                 taskManager.TaskCompleted(-1, taskIndex); 
+            }
+        }
+
+        // 4. Destroy THIS GameObject (Task Completer)
+        if (enableDebugLog)
+            Debug.Log($"[TaskCompleter] 🔥 Delayed destruction of Task Completer GameObject after {delay} seconds: {gameObject.name}");
+        
+        Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// Manually completes the task (for debugging).
+    /// </summary>
+    [ContextMenu("Manual Complete Task")]
     public void ManualCompleteTask()
     {
-        if (!isInitialized || taskHandler == null)
+        if (!isInitialized || taskManager == null || isTaskFinished)
         {
-            Debug.LogWarning("[TaskCompleter] 未初始化或TaskHandler引用为空，无法手动完成任务");
+            Debug.LogWarning("[TaskCompleter] Not ready, manager is null, or already finished, cannot manually complete task.");
             return;
         }
 
-        // 通知任务处理器任务完成
-        taskHandler.OnTaskCompleted(taskIndex, gameObject);
+        // Start the task completion sequence
+        StartTaskCompletionSequence();
 
         if (enableDebugLog)
-            Debug.Log("[TaskCompleter] 手动完成任务");
+            Debug.Log("[TaskCompleter] Manually completed task.");
     }
 
     /// <summary>
-    /// 检查任务完成器状态（调试用）
+    /// Checks the status of the Task Completer (for debugging).
     /// </summary>
-    [ContextMenu("检查状态")]
+    [ContextMenu("Check Status")]
     public void CheckStatus()
     {
-        Debug.Log($"[TaskCompleter] === 任务完成器状态 ===");
-        Debug.Log($"是否已初始化: {isInitialized}");
-        Debug.Log($"任务索引: {taskIndex}");
-        Debug.Log($"需要物品标签: {requiredItemTag}");
-        Debug.Log($"TaskHandler引用: {(taskHandler != null ? "已设置" : "未设置")}");
-        Debug.Log($"触发器碰撞体: {(triggerCollider != null ? "已设置" : "未设置")}");
-        Debug.Log($"任务描述文本组件: {(taskDescriptionText != null ? "已设置" : "未设置")}");
+        Debug.Log($"[TaskCompleter] === Task Completer Status ===");
+        Debug.Log($"Is Initialized: {isInitialized}");
+        Debug.Log($"Is Task Finished: {isTaskFinished}");
+        Debug.Log($"Task Index: {taskIndex}");
+        Debug.Log($"Required Item Tag: {requiredItemTag}");
+        Debug.Log($"TaskManager Reference: {(taskManager != null ? "Set" : "Not Set")}");
+        Debug.Log($"ParticleSystem Reference: {(completionParticle != null ? "Set" : "Not Set")}");
+        Debug.Log($"Trigger Collider: {(triggerCollider != null ? "Set" : "Not Set")}");
+        Debug.Log($"Task Description Text Component: {(taskDescriptionText != null ? "Set" : "Not Set")}");
 
         if (triggerCollider != null)
         {
-            Debug.Log($"碰撞体类型: {triggerCollider.GetType().Name}");
-            Debug.Log($"是否为触发器: {triggerCollider.isTrigger}");
+            Debug.Log($"Collider Type: {triggerCollider.GetType().Name}");
+            Debug.Log($"Is Trigger: {triggerCollider.isTrigger}");
         }
 
         if (taskDescriptionText != null)
         {
-            Debug.Log($"当前显示文本: {taskDescriptionText.text}");
+            Debug.Log($"Current Display Text: {taskDescriptionText.text}");
         }
     }
 
     /// <summary>
-    /// 测试设置文本（调试用）
+    /// Tests setting the text (for debugging).
     /// </summary>
-    [ContextMenu("测试设置文本")]
+    [ContextMenu("Test Set Text")]
     public void TestSetText()
     {
         SetTaskDescriptionText("Need Manual");
     }
 
     /// <summary>
-    /// 在Scene视图中显示触发区域
+    /// Draws the trigger area in the Scene view.
     /// </summary>
     void OnDrawGizmosSelected()
     {
@@ -223,6 +301,6 @@ public class TaskCompleter : MonoBehaviour
     void OnDestroy()
     {
         if (enableDebugLog)
-            Debug.Log($"[TaskCompleter] 任务完成器已销毁 - 任务索引: {taskIndex}");
+            Debug.Log($"[TaskCompleter] Task Completer destroyed - Task Index: {taskIndex}");
     }
 }
